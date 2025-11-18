@@ -137,7 +137,7 @@ export const uploadInspectionPhotos = (req: Request, res: Response): void => {
       });
 
       const results = await Promise.all(photoPromises);
-      const photos = results.map(r => r.rows[0]);
+      const photos = results.map((r: any) => r.rows[0]);
 
       res.json({
         success: true,

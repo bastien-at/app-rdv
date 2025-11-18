@@ -120,7 +120,7 @@ export const calculateAvailableSlots = async (
     }
     
     // Vérifier les réservations existantes
-    const hasBookingConflict = existingBookings.some(booking => {
+    const hasBookingConflict = existingBookings.filter((booking: any) => {
       const bookingStart = new Date(booking.start_datetime);
       const bookingEnd = addMinutes(new Date(booking.end_datetime), bufferMinutes);
       
@@ -129,14 +129,14 @@ export const calculateAvailableSlots = async (
         isWithinInterval(slotEnd, { start: bookingStart, end: bookingEnd }) ||
         isWithinInterval(bookingStart, { start: slotStart, end: slotEndWithBuffer })
       );
-    });
+    }).length > 0;
     
     if (hasBookingConflict) {
       return { ...slot, available: false };
     }
     
     // Vérifier les blocages
-    const hasBlockConflict = blocks.some(block => {
+    const hasBlockConflict = blocks.filter((block: any) => {
       const blockStart = new Date(block.start_datetime);
       const blockEnd = new Date(block.end_datetime);
       
@@ -144,14 +144,14 @@ export const calculateAvailableSlots = async (
         isWithinInterval(slotStart, { start: blockStart, end: blockEnd }) ||
         isWithinInterval(slotEnd, { start: blockStart, end: blockEnd })
       );
-    });
+    }).length > 0;
     
     if (hasBlockConflict) {
       return { ...slot, available: false };
     }
     
     // Vérifier les locks
-    const hasLockConflict = locks.some(lock => {
+    const hasLockConflict = locks.filter((lock: any) => {
       const lockStart = new Date(lock.start_datetime);
       const lockEnd = new Date(lock.end_datetime);
       

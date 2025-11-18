@@ -172,6 +172,7 @@ export interface BookingWithDetails extends Booking {
   store_name?: string;
   service_name?: string;
   service_price?: number;
+  service_type?: string;
   technician_name?: string;
 }
 

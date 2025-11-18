@@ -1,4 +1,4 @@
-import { Pool, PoolClient, QueryResult } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 
 // Configuration du pool de connexions PostgreSQL
 const pool = new Pool({
@@ -9,7 +9,7 @@ const pool = new Pool({
 });
 
 // Gestion des erreurs du pool
-pool.on('error', (err) => {
+pool.on('error', (err: any) => {
   console.error('Erreur inattendue du pool PostgreSQL:', err);
   process.exit(-1);
 });
@@ -17,7 +17,7 @@ pool.on('error', (err) => {
 /**
  * Exécute une requête SQL
  */
-export const query = async <T = any>(
+export const query = async <T extends QueryResultRow = any>(
   text: string,
   params?: any[]
 ): Promise<QueryResult<T>> => {

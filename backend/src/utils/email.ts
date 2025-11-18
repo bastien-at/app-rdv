@@ -46,7 +46,7 @@ export const sendConfirmationEmail = async (
   const modifyUrl = `${process.env.FRONTEND_URL}/booking/${booking.booking_token}`;
   const cancelUrl = `${process.env.FRONTEND_URL}/booking/${booking.booking_token}/cancel`;
   
-  const calendar = generateICalEvent(booking);
+  const calendar = generateICalContent(booking);
   
   const htmlContent = `
     <!DOCTYPE html>
