@@ -1,0 +1,275 @@
+# 🚴 Bike Fitting Booking System
+
+Application web complète de réservation de créneaux d'étude posturale (bike fitting) en magasin.
+
+## 🎯 Fonctionnalités
+
+### Côté Client
+
+- ✅ Sélection de magasin avec filtrage géographique
+- ✅ Choix du service (Route, VTT, Triathlon)
+- ✅ Calendrier interactif avec créneaux disponibles en temps réel
+- ✅ Formulaire de réservation avec informations client
+- ✅ Confirmation par email avec pièce jointe iCal
+- ✅ Rappels automatiques J-2 et J-1
+- ✅ Modification/annulation sécurisée par lien unique
+
+### Côté Admin
+
+- ✅ Dashboard avec vue agenda
+- ✅ Gestion du planning et des créneaux
+- ✅ Gestion des réservations (validation, annulation, reprogrammation)
+- ✅ Configuration des services et horaires
+- ✅ Reporting et statistiques
+
+## 🛠️ Stack Technique
+
+- **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS
+- **Backend**: Node.js + Express + TypeScript
+- **Base de données**: PostgreSQL (Supabase)
+- **Auth**: JWT
+- **Email**: Nodemailer
+- **Calendar**: react-big-calendar + date-fns
+- **ORM**: node-postgres (pg)
+
+## 📋 Prérequis
+
+- Node.js 18+
+- Compte Supabase (gratuit) : https://supabase.com
+- npm ou yarn
+
+## 🚀 Installation
+
+### 1. Cloner le projet
+
+```bash
+git clone <repo-url>
+cd bike-fitting-booking
+```
+
+### 2. Installer les dépendances
+
+```bash
+npm install
+```
+
+### 3. Configurer la base de données
+
+Créer une base de données PostgreSQL :
+
+```bash
+createdb bike_fitting_db
+```
+
+Exécuter les migrations :
+
+```bash
+cd backend
+npm run migrate
+```
+
+### 4. Configurer les variables d'environnement
+
+Copier le fichier `.env.example` vers `.env` et remplir les valeurs :
+
+```bash
+cp .env.example .env
+```
+
+Éditer `.env` avec vos configurations.
+
+### 5. Charger les données de test (optionnel)
+
+```bash
+cd backend
+npm run seed
+```
+
+Cela créera :
+
+- 3 magasins fictifs (Paris, Lyon, Marseille)
+- 3 services par magasin (Route, VTT, Triathlon)
+- 2 techniciens par magasin
+- Quelques réservations d'exemple
+
+## 🏃 Lancement
+
+### Mode développement
+
+```bash
+# Lancer frontend + backend simultanément
+npm run dev
+```
+
+Ou séparément :
+
+```bash
+# Backend (port 3000)
+npm run dev:backend
+
+# Frontend (port 5173)
+npm run dev:frontend
+```
+
+### Mode production
+
+```bash
+# Build
+npm run build
+
+# Start
+npm run start
+```
+
+## 📁 Structure du projet
+
+```
+bike-fitting-booking/
+├── frontend/                # Application React
+│   ├── src/
+│   │   ├── components/     # Composants réutilisables
+│   │   ├── pages/          # Pages principales
+│   │   ├── services/       # Services API
+│   │   ├── hooks/          # Custom hooks
+│   │   ├── types/          # Types TypeScript
+│   │   └── utils/          # Utilitaires
+│   └── package.json
+├── backend/                 # API Express
+│   ├── src/
+│   │   ├── routes/         # Routes API
+│   │   ├── controllers/    # Contrôleurs
+│   │   ├── models/         # Modèles de données
+│   │   ├── services/       # Logique métier
+│   │   ├── middleware/     # Middlewares
+│   │   ├── utils/          # Utilitaires
+│   │   └── db/             # Configuration DB
+│   └── package.json
+└── package.json             # Root package.json
+```
+
+## 🔌 API Endpoints
+
+### Public
+
+```
+GET    /api/stores                                    - Liste des magasins
+GET    /api/stores/:id/services                       - Services d'un magasin
+GET    /api/stores/:id/availability                   - Créneaux disponibles
+POST   /api/bookings                                  - Créer une réservation
+GET    /api/bookings/:token                           - Détails réservation
+PUT    /api/bookings/:token                           - Modifier réservation
+DELETE /api/bookings/:token                           - Annuler réservation
+```
+
+### Admin (authentifié)
+
+```
+POST   /api/admin/login                               - Connexion admin
+GET    /api/admin/stores/:id/bookings                 - Réservations d'un magasin
+PUT    /api/admin/bookings/:id/status                 - Changer statut réservation
+POST   /api/admin/availability-blocks                 - Bloquer une plage horaire
+DELETE /api/admin/availability-blocks/:id             - Supprimer un blocage
+GET    /api/admin/stores/:id/stats                    - Statistiques magasin
+```
+
+## 🗄️ Schéma de base de données
+
+Voir `backend/src/db/schema.sql` pour le schéma complet.
+
+Tables principales :
+
+- `stores` - Magasins
+- `services` - Services proposés
+- `technicians` - Techniciens
+- `bookings` - Réservations
+- `availability_blocks` - Blocages de créneaux
+- `email_logs` - Logs des emails envoyés
+
+## 📧 Configuration Email
+
+Pour Gmail, créer un "App Password" :
+
+1. Activer la validation en 2 étapes
+2. Aller dans "Sécurité" > "Mots de passe des applications"
+3. Générer un mot de passe pour l'application
+4. Utiliser ce mot de passe dans `SMTP_PASS`
+
+## 🧪 Tests
+
+```bash
+# Backend
+cd backend
+npm test
+
+# Frontend
+cd frontend
+npm test
+```
+
+## 📦 Déploiement
+
+### Vercel (Frontend) + Railway (Backend + DB)
+
+1. **Backend sur Railway** :
+
+   - Créer un nouveau projet
+   - Ajouter PostgreSQL
+   - Déployer depuis GitHub
+   - Configurer les variables d'environnement
+
+2. **Frontend sur Vercel** :
+   - Importer le projet depuis GitHub
+   - Configurer le root directory : `frontend`
+   - Ajouter la variable `VITE_API_URL`
+
+## 🔐 Sécurité
+
+- ✅ JWT pour l'authentification admin
+- ✅ Token unique par réservation
+- ✅ Rate limiting sur les endpoints sensibles
+- ✅ Validation stricte des inputs (côté client et serveur)
+- ✅ Protection CSRF
+- ✅ Sanitization des données
+- ✅ HTTPS en production
+
+## 📝 Règles métier
+
+- Délai minimum de réservation : 48h
+- Fenêtre de réservation : 3 mois maximum
+- Buffer entre créneaux : 15 minutes
+- Lock de créneau pendant sélection : 10 minutes
+- Pas de double booking
+- Rappels automatiques J-2 et J-1
+
+## 🎨 Design
+
+- Mobile-first responsive
+- Tailwind CSS pour le styling
+- Composants réutilisables
+- Design system cohérent
+- Accessibilité (WCAG 2.1)
+
+## 📊 Reporting
+
+Le dashboard admin inclut :
+
+- Taux de remplissage
+- Taux de no-show
+- CA généré
+- Export CSV des réservations
+
+## 🤝 Contribution
+
+1. Fork le projet
+2. Créer une branche (`git checkout -b feature/AmazingFeature`)
+3. Commit les changements (`git commit -m 'Add AmazingFeature'`)
+4. Push vers la branche (`git push origin feature/AmazingFeature`)
+5. Ouvrir une Pull Request
+
+## 📄 Licence
+
+MIT
+
+## 👥 Support
+
+Pour toute question : support@alltricks.com

@@ -1,0 +1,87 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Bike } from 'lucide-react';
+import Button from '../../components/Button';
+import Input from '../../components/Input';
+import Card from '../../components/Card';
+import { adminLogin } from '../../services/api';
+
+export default function AdminLoginPage() {
+  const navigate = useNavigate();
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const token = await adminLogin(email, password);
+      localStorage.setItem('admin_token', token);
+      navigate('/admin/dashboard');
+    } catch (err) {
+      setError('Email ou mot de passe incorrect');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <Bike className="h-12 w-12 text-blue-500 mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            Espace Professionnel
+          </h1>
+          <p className="text-gray-600">
+            Connectez-vous pour gérer vos réservations
+          </p>
+        </div>
+
+        <Card>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <Input
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              placeholder="admin@alltricks.com"
+            />
+
+            <Input
+              label="Mot de passe"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              placeholder="••••••••"
+            />
+
+            {error && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
+                {error}
+              </div>
+            )}
+
+            <Button
+              type="submit"
+              fullWidth
+              loading={loading}
+            >
+              Se connecter
+            </Button>
+          </form>
+        </Card>
+
+        <p className="text-center text-sm text-gray-600 mt-6">
+          Comptes de test : admin@alltricks.com / admin123
+        </p>
+      </div>
+    </div>
+  );
+}
