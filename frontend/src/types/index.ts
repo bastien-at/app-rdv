@@ -83,8 +83,12 @@ export interface Booking {
   customer_phone: string;
   customer_data: CustomerData;
   store_name?: string;
+  store_address?: string;
+  store_postal_code?: string;
+  store_city?: string;
   service_name?: string;
   service_price?: number;
+  service_duration?: number;
   technician_name?: string;
   created_at: string;
   updated_at: string;

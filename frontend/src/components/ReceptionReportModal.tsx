@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { X, Euro, Upload, Trash2, Camera } from 'lucide-react';
+import { X, Upload, Trash2, Camera, Send } from 'lucide-react';
 import Button from './Button';
 import Card from './Card';
 

@@ -196,7 +196,6 @@ export default function MyBookingsPage() {
                       <Card 
                         key={booking.id} 
                         className="hover:shadow-lg transition-shadow animate-slide-up"
-                        style={{animationDelay: `${index * 0.1}s`}}
                       >
                         <div className="flex flex-col md:flex-row gap-6">
                           {/* Left: Service Info */}
