@@ -15,7 +15,24 @@ async function migrate() {
       'utf8',
     );
 
+    // 1. Schéma de base
     await pool.query(schemaSQL);
+
+    // 2. Migrations incrémentales
+    const enhanceServicesPath = path.join(
+      __dirname,
+      'migrations',
+      '002_enhance_services.sql',
+    );
+    if (fs.existsSync(enhanceServicesPath)) {
+      const enhanceServicesSQL = fs.readFileSync(enhanceServicesPath, 'utf8');
+      await pool.query(enhanceServicesSQL);
+      console.log('✅ Migration 002_enhance_services.sql appliquée');
+    } else {
+      console.warn(
+        '⚠️ Migration 002_enhance_services.sql non trouvée, colonnes avancées des services non appliquées',
+      );
+    }
 
     console.log('✅ Migration terminée avec succès!');
   } catch (error) {

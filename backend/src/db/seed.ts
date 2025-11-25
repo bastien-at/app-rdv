@@ -74,6 +74,177 @@ const seed = async () => {
           sunday: { open: '00:00', close: '00:00', closed: true },
         },
       },
+      {
+        name: 'Alltricks Store - Coignières',
+        address: "10 rue du Pont d'Aulneau",
+        city: 'Coignières',
+        postal_code: '78310',
+        phone: '',
+        email: '',
+        latitude: null,
+        longitude: null,
+        opening_hours: {
+          monday: { open: '10:00', close: '19:00', closed: false },
+          tuesday: { open: '10:00', close: '19:00', closed: false },
+          wednesday: { open: '10:00', close: '19:00', closed: false },
+          thursday: { open: '10:00', close: '19:00', closed: false },
+          friday: { open: '10:00', close: '19:00', closed: false },
+          saturday: { open: '10:00', close: '19:00', closed: false },
+          sunday: { open: '00:00', close: '00:00', closed: true },
+        },
+      },
+      {
+        name: 'Alltricks Store - Issy-les-Moulineaux',
+        address: '7-9 rue Auguste Gervais',
+        city: 'Issy-les-Moulineaux',
+        postal_code: '92130',
+        phone: '',
+        email: '',
+        latitude: null,
+        longitude: null,
+        opening_hours: {
+          monday: { open: '10:00', close: '19:00', closed: false },
+          tuesday: { open: '10:00', close: '19:00', closed: false },
+          wednesday: { open: '10:00', close: '19:00', closed: false },
+          thursday: { open: '10:00', close: '19:00', closed: false },
+          friday: { open: '10:00', close: '19:00', closed: false },
+          saturday: { open: '10:00', close: '19:00', closed: false },
+          sunday: { open: '00:00', close: '00:00', closed: true },
+        },
+      },
+      {
+        name: 'Alltricks Store - Bron',
+        address: '332 Avenue du Général de Gaulle',
+        city: 'Bron',
+        postal_code: '69500',
+        phone: '',
+        email: '',
+        latitude: null,
+        longitude: null,
+        opening_hours: {
+          monday: { open: '10:00', close: '19:00', closed: false },
+          tuesday: { open: '10:00', close: '19:00', closed: false },
+          wednesday: { open: '10:00', close: '19:00', closed: false },
+          thursday: { open: '10:00', close: '19:00', closed: false },
+          friday: { open: '10:00', close: '19:00', closed: false },
+          saturday: { open: '10:00', close: '19:00', closed: false },
+          sunday: { open: '00:00', close: '00:00', closed: true },
+        },
+      },
+      {
+        name: 'Alltricks Store - Bouc-Bel-Air',
+        address: 'Decathlon Village, La Petite Bastide',
+        city: 'Bouc-Bel-Air',
+        postal_code: '13320',
+        phone: '',
+        email: '',
+        latitude: null,
+        longitude: null,
+        opening_hours: {
+          monday: { open: '10:00', close: '19:00', closed: false },
+          tuesday: { open: '10:00', close: '19:00', closed: false },
+          wednesday: { open: '10:00', close: '19:00', closed: false },
+          thursday: { open: '10:00', close: '19:00', closed: false },
+          friday: { open: '10:00', close: '19:00', closed: false },
+          saturday: { open: '10:00', close: '19:00', closed: false },
+          sunday: { open: '00:00', close: '00:00', closed: true },
+        },
+      },
+      {
+        name: 'Alltricks Store - Annemasse',
+        address: 'Decathlon, 26 Rue de la Résistance',
+        city: 'Annemasse',
+        postal_code: '74100',
+        phone: '',
+        email: '',
+        latitude: null,
+        longitude: null,
+        opening_hours: {
+          monday: { open: '10:00', close: '19:00', closed: false },
+          tuesday: { open: '10:00', close: '19:00', closed: false },
+          wednesday: { open: '10:00', close: '19:00', closed: false },
+          thursday: { open: '10:00', close: '19:00', closed: false },
+          friday: { open: '10:00', close: '19:00', closed: false },
+          saturday: { open: '10:00', close: '19:00', closed: false },
+          sunday: { open: '00:00', close: '00:00', closed: true },
+        },
+      },
+      {
+        name: 'Alltricks Store - Toulouse',
+        address: 'Decathlon, ZAC de la Masquère',
+        city: 'Escalquens',
+        postal_code: '31750',
+        phone: '',
+        email: '',
+        latitude: null,
+        longitude: null,
+        opening_hours: {
+          monday: { open: '10:00', close: '19:00', closed: false },
+          tuesday: { open: '10:00', close: '19:00', closed: false },
+          wednesday: { open: '10:00', close: '19:00', closed: false },
+          thursday: { open: '10:00', close: '19:00', closed: false },
+          friday: { open: '10:00', close: '19:00', closed: false },
+          saturday: { open: '10:00', close: '19:00', closed: false },
+          sunday: { open: '00:00', close: '00:00', closed: true },
+        },
+      },
+      {
+        name: "Alltricks Store - Lille",
+        address: '4 Boulevard de Mons',
+        city: "Villeneuve d'Ascq",
+        postal_code: '59650',
+        phone: '',
+        email: '',
+        latitude: null,
+        longitude: null,
+        opening_hours: {
+          monday: { open: '10:00', close: '19:00', closed: false },
+          tuesday: { open: '10:00', close: '19:00', closed: false },
+          wednesday: { open: '10:00', close: '19:00', closed: false },
+          thursday: { open: '10:00', close: '19:00', closed: false },
+          friday: { open: '10:00', close: '19:00', closed: false },
+          saturday: { open: '10:00', close: '19:00', closed: false },
+          sunday: { open: '00:00', close: '00:00', closed: true },
+        },
+      },
+      {
+        name: 'Alltricks Store - Mérignac',
+        address: '5 rue Hipparque',
+        city: 'Mérignac',
+        postal_code: '33700',
+        phone: '',
+        email: '',
+        latitude: null,
+        longitude: null,
+        opening_hours: {
+          monday: { open: '10:00', close: '19:00', closed: false },
+          tuesday: { open: '10:00', close: '19:00', closed: false },
+          wednesday: { open: '10:00', close: '19:00', closed: false },
+          thursday: { open: '10:00', close: '19:00', closed: false },
+          friday: { open: '10:00', close: '19:00', closed: false },
+          saturday: { open: '10:00', close: '19:00', closed: false },
+          sunday: { open: '00:00', close: '00:00', closed: true },
+        },
+      },
+      {
+        name: 'Alltricks Store - Antibes',
+        address: 'Decathlon, 1800 Chemin des Terriers',
+        city: 'Antibes',
+        postal_code: '06600',
+        phone: '',
+        email: '',
+        latitude: null,
+        longitude: null,
+        opening_hours: {
+          monday: { open: '10:00', close: '19:00', closed: false },
+          tuesday: { open: '10:00', close: '19:00', closed: false },
+          wednesday: { open: '10:00', close: '19:00', closed: false },
+          thursday: { open: '10:00', close: '19:00', closed: false },
+          friday: { open: '10:00', close: '19:00', closed: false },
+          saturday: { open: '10:00', close: '19:00', closed: false },
+          sunday: { open: '00:00', close: '00:00', closed: true },
+        },
+      },
     ];
 
     const storeIds: string[] = [];
@@ -183,15 +354,32 @@ const seed = async () => {
       ['Pierre Bernard', 'Julie Petit'],
     ];
 
+    // Pour les 3 premiers magasins, utiliser les noms prédéfinis
+    const predefinedCount = technicianNames.length;
+
     for (let i = 0; i < storeIds.length; i++) {
-      for (const name of technicianNames[i]) {
-        const email = name.toLowerCase().replace(' ', '.') + '@alltricks.com';
-        await query(
-          `INSERT INTO technicians (store_id, name, email)
-           VALUES ($1, $2, $3)`,
-          [storeIds[i], name, email]
-        );
-        console.log(`  ✓ ${name} créé`);
+      if (i < predefinedCount) {
+        for (const name of technicianNames[i]) {
+          const email = name.toLowerCase().replace(' ', '.') + '@alltricks.com';
+          await query(
+            `INSERT INTO technicians (store_id, name, email)
+             VALUES ($1, $2, $3)`,
+            [storeIds[i], name, email]
+          );
+          console.log(`  ✓ ${name} créé`);
+        }
+      } else {
+        // Pour les autres magasins, créer deux techniciens génériques
+        for (let t = 1; t <= 2; t++) {
+          const name = `Technicien ${t} ${stores[i].city}`;
+          const email = `tech${t}.${stores[i].city.toLowerCase().replace(/\s+/g, '')}@alltricks.com`;
+          await query(
+            `INSERT INTO technicians (store_id, name, email)
+             VALUES ($1, $2, $3)`,
+            [storeIds[i], name, email]
+          );
+          console.log(`  ✓ ${name} créé`);
+        }
       }
     }
 
@@ -210,70 +398,112 @@ const seed = async () => {
 
     // Admin par magasin
     for (let i = 0; i < storeIds.length; i++) {
-      const city = stores[i].city.toLowerCase();
+      const citySlug = stores[i].city.toLowerCase().replace(/\s+/g, '');
+      const email = `magasin_${citySlug}@alltricks.com`;
+
       await query(
         `INSERT INTO admins (email, password_hash, name, store_id, role)
          VALUES ($1, $2, $3, $4, $5)`,
         [
-          `admin.${city}@alltricks.com`,
+          email,
           adminPassword,
           `Admin ${stores[i].city}`,
           storeIds[i],
           'store_admin',
         ]
       );
-      console.log(`  ✓ Admin ${stores[i].city} créé (admin.${city}@alltricks.com / admin123)`);
+      console.log(`  ✓ Admin ${stores[i].city} créé (${email} / admin123)`);
     }
 
     // 5. Créer quelques réservations d'exemple
     console.log('📅 Création de réservations d\'exemple...');
-    
-    // Récupérer un service et un technicien
-    const serviceResult = await query('SELECT id, duration_minutes FROM services LIMIT 1');
-    const technicianResult = await query('SELECT id, store_id FROM technicians LIMIT 1');
-    
-    if (serviceResult.rows.length > 0 && technicianResult.rows.length > 0) {
-      const service = serviceResult.rows[0];
-      const technician = technicianResult.rows[0];
-      
-      // Réservation dans 3 jours
-      const futureDate = new Date();
-      futureDate.setDate(futureDate.getDate() + 3);
-      futureDate.setHours(14, 0, 0, 0);
-      
-      const endDate = new Date(futureDate);
-      endDate.setMinutes(endDate.getMinutes() + service.duration_minutes);
-      
-      await query(
-        `INSERT INTO bookings (
-          booking_token, store_id, service_id, technician_id,
-          start_datetime, end_datetime, status,
-          customer_firstname, customer_lastname, customer_email, customer_phone,
-          customer_data
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
-        [
-          generateBookingToken(),
-          technician.store_id,
-          service.id,
-          technician.id,
-          futureDate,
-          endDate,
-          'confirmed',
-          'Jean',
-          'Dupont',
-          'jean.dupont@example.com',
-          '0612345678',
-          JSON.stringify({
-            height: 180,
-            weight: 75,
-            shoe_size: 43,
-            practice_frequency: '3-4 fois par semaine',
-            pain_description: 'Légère douleur au genou gauche',
-            bike_info: 'Vélo route à acheter',
-          }),
-        ]
-      );
-      console.log('  ✓ Réservation d\'exemple créée');
+
+    // On va créer des réservations entre le 01/12 et le 07/12 (année courante)
+    const currentYear = new Date().getFullYear();
+
+    // Récupérer des services d'étude posturale et des techniciens pour plusieurs magasins
+    const servicesByStore = await query(
+      'SELECT id, store_id, duration_minutes FROM services WHERE service_type = $1',
+      ['fitting']
+    );
+    const techniciansByStore = await query(
+      'SELECT id, store_id FROM technicians'
+    );
+
+    if (servicesByStore.rows.length > 0 && techniciansByStore.rows.length > 0) {
+      // Ne prendre que quelques magasins pour la démo (par ex. les 3 premiers qui ont techniciens + services)
+      const demoStores: { store_id: string; service_id: string; duration_minutes: number; technician_id: string }[] = [];
+
+      for (const service of servicesByStore.rows) {
+        const tech = techniciansByStore.rows.find(t => t.store_id === service.store_id);
+        if (tech) {
+          demoStores.push({
+            store_id: service.store_id,
+            service_id: service.id,
+            duration_minutes: service.duration_minutes,
+            technician_id: tech.id,
+          });
+        }
+        if (demoStores.length >= 3) break;
+      }
+
+      const demoStatuses: ('pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show')[] = [
+        'pending',
+        'confirmed',
+        'completed',
+        'cancelled',
+        'no_show',
+      ];
+
+      for (const demo of demoStores) {
+        for (let day = 1; day <= 7; day++) {
+          // Créer 2 créneaux par jour à 10h et 15h avec des statuts variés
+          const baseDateMorning = new Date(currentYear, 11, day, 10, 0, 0, 0); // mois 11 = décembre
+          const baseDateAfternoon = new Date(currentYear, 11, day, 15, 0, 0, 0);
+
+          const slots = [baseDateMorning, baseDateAfternoon];
+
+          for (let i = 0; i < slots.length; i++) {
+            const start = slots[i];
+            const end = new Date(start);
+            end.setMinutes(end.getMinutes() + demo.duration_minutes);
+
+            const statusIndex = (day + i) % demoStatuses.length;
+            const status = demoStatuses[statusIndex];
+
+            await query(
+              `INSERT INTO bookings (
+                booking_token, store_id, service_id, technician_id,
+                start_datetime, end_datetime, status,
+                customer_firstname, customer_lastname, customer_email, customer_phone,
+                customer_data
+              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+              [
+                generateBookingToken(),
+                demo.store_id,
+                demo.service_id,
+                demo.technician_id,
+                start,
+                end,
+                status,
+                'Client',
+                `Demo-${day}-${i + 1}`,
+                `client.demo+${day}${i + 1}@example.com`,
+                '0612345678',
+                JSON.stringify({
+                  height: 180,
+                  weight: 75,
+                  shoe_size: 43,
+                  practice_frequency: '2-3 fois par semaine',
+                  bike_info: 'Vélo route',
+                }),
+              ]
+            );
+          }
+        }
+      }
+
+      console.log('  ✓ Réservations de démo créées pour plusieurs magasins (01/12 au 07/12)');
     }
 
     console.log('\n✅ Seeding terminé avec succès!');

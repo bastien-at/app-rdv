@@ -34,14 +34,53 @@ export interface DaySchedule {
 
 export interface Service {
   id: string;
-  store_id: string;
+  store_id: string | null;
+  service_type: 'fitting' | 'workshop';
   name: string;
   description?: string;
   duration_minutes: number;
   price: number;
+  category?: string;
+  image_url?: string;
+  is_global: boolean;
   active: boolean;
+  updated_by?: string;
   created_at: Date;
   updated_at: Date;
+}
+
+export interface ServiceHistory {
+  id: string;
+  service_id: string;
+  action: 'created' | 'updated' | 'deleted' | 'activated' | 'deactivated';
+  changed_fields?: Record<string, { old: any; new: any }>;
+  changed_by?: string;
+  changed_at: Date;
+  snapshot?: Service;
+}
+
+export interface CreateServiceData {
+  store_id?: string;
+  service_type: 'fitting' | 'workshop';
+  name: string;
+  description?: string;
+  duration_minutes: number;
+  price: number;
+  category?: string;
+  image_url?: string;
+  is_global?: boolean;
+  active?: boolean;
+}
+
+export interface UpdateServiceData {
+  name?: string;
+  description?: string;
+  duration_minutes?: number;
+  price?: number;
+  category?: string;
+  image_url?: string;
+  is_global?: boolean;
+  active?: boolean;
 }
 
 export interface Technician {
@@ -114,7 +153,7 @@ export interface Admin {
   email: string;
   password_hash: string;
   name: string;
-  store_id?: string;
+  store_id: string | null;
   role: 'super_admin' | 'store_admin';
   active: boolean;
   created_at: Date;
@@ -178,6 +217,54 @@ export interface BookingWithDetails extends Booking {
 
 export interface StoreWithServices extends Store {
   services?: Service[];
+}
+
+export interface CreateAdminData {
+  email: string;
+  password: string;
+  name: string;
+  role: 'super_admin' | 'store_admin';
+  store_id?: string;
+}
+
+export interface UpdateAdminData {
+  email?: string;
+  password?: string;
+  name?: string;
+  role?: 'super_admin' | 'store_admin';
+  store_id?: string;
+  active?: boolean;
+}
+
+export interface AdminWithStore extends Admin {
+  store_name?: string;
+  store_city?: string;
+}
+
+export interface CreateStoreData {
+  name: string;
+  address: string;
+  city: string;
+  postal_code: string;
+  phone: string;
+  email: string;
+  latitude?: number;
+  longitude?: number;
+  opening_hours: OpeningHours;
+  active?: boolean;
+}
+
+export interface UpdateStoreData {
+  name?: string;
+  address?: string;
+  city?: string;
+  postal_code?: string;
+  phone?: string;
+  email?: string;
+  latitude?: number;
+  longitude?: number;
+  opening_hours?: OpeningHours;
+  active?: boolean;
 }
 
 export interface BookingStats {

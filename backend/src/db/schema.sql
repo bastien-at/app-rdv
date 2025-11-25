@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS availability_blocks (
   start_datetime TIMESTAMP NOT NULL,
   end_datetime TIMESTAMP NOT NULL,
   reason VARCHAR(255),
+  block_type VARCHAR(50) DEFAULT 'other',
   created_at TIMESTAMP DEFAULT NOW(),
   CONSTRAINT block_no_overlap CHECK (start_datetime < end_datetime)
 );

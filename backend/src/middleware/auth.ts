@@ -101,3 +101,45 @@ export const requireStoreAccess = (
   
   next();
 };
+
+/**
+ * Middleware pour vérifier qu'un utilisateur est admin (store_admin ou super_admin)
+ */
+export const authenticateAdmin = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void => {
+  try {
+    const authHeader = req.headers.authorization;
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({ 
+        success: false, 
+        error: 'Token d\'authentification manquant' 
+      });
+      return;
+    }
+    
+    const token = authHeader.substring(7);
+    const decoded = verifyToken(token);
+    
+    // Vérifier que l'utilisateur est admin
+    if (decoded.role !== 'super_admin' && decoded.role !== 'store_admin') {
+      res.status(403).json({ 
+        success: false, 
+        error: 'Accès refusé : droits administrateur requis' 
+      });
+      return;
+    }
+    
+    req.user = decoded;
+    (req as any).admin = decoded; // Pour compatibilité avec serviceRoutes
+    next();
+  } catch (error) {
+    res.status(401).json({ 
+      success: false, 
+      error: 'Token invalide ou expiré' 
+    });
+  }
+};

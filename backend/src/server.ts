@@ -79,8 +79,13 @@ app.listen(PORT, async () => {
   console.log('📧 Envoi d\'emails désactivé');
   
   // Nettoyer les locks expirés au démarrage
-  await cleanExpiredLocks();
-  console.log('✅ Locks expirés nettoyés');
+  try {
+    await cleanExpiredLocks();
+    console.log('✅ Locks expirés nettoyés');
+  } catch (error) {
+    console.error('⚠️  Erreur lors du nettoyage des locks (base de données inaccessible):', error instanceof Error ? error.message : error);
+    console.log('⚠️  Le serveur continue sans connexion à la base de données');
+  }
 });
 
 // Gestion de l'arrêt gracieux

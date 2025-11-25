@@ -136,7 +136,7 @@ export const createBooking = async (
           technician_id || null,
           startDate,
           endDate,
-          'confirmed',
+          'pending',
           customer_firstname,
           customer_lastname,
           customer_email,
@@ -148,38 +148,10 @@ export const createBooking = async (
       return result.rows[0];
     });
     
-    // Récupérer les détails complets pour l'email
-    const bookingDetailsResult = await query<BookingWithDetails>(
-      `SELECT 
-        b.*,
-        srv.name as service_name,
-        srv.service_type,
-        srv.price as service_price,
-        srv.duration_minutes as service_duration,
-        st.name as store_name,
-        st.address as store_address,
-        st.city as store_city,
-        st.postal_code as store_postal_code,
-        t.name as technician_name
-      FROM bookings b
-      JOIN services srv ON b.service_id = srv.id
-      JOIN stores st ON b.store_id = st.id
-      LEFT JOIN technicians t ON b.technician_id = t.id
-      WHERE b.id = $1`,
-      [booking.id]
-    );
-    
-    const bookingDetails = bookingDetailsResult.rows[0];
-    
-    // Envoyer l'email de confirmation (async, ne pas attendre)
-    sendConfirmationEmail(bookingDetails).catch((error) => {
-      console.error('Erreur lors de l\'envoi de l\'email:', error);
-    });
-    
     res.status(201).json({
       success: true,
       data: booking,
-      message: 'Réservation créée avec succès',
+      message: 'Demande de réservation créée avec succès',
     });
   } catch (error: any) {
     console.error('Erreur lors de la création de la réservation:', error);

@@ -108,3 +108,15 @@ export const validateUpdateStatus = [
   body('internal_notes').optional().trim(),
   validate,
 ];
+
+/**
+ * Validations pour la mise à jour + confirmation d'une réservation côté admin
+ */
+export const validateAdminUpdateAndConfirmBooking = [
+  param('id').isUUID().withMessage('ID réservation invalide'),
+  body('service_id').optional().isUUID().withMessage('ID service invalide'),
+  body('start_datetime').optional().isISO8601().withMessage('Date/heure invalide'),
+  body('technician_id').optional().isUUID().withMessage('ID technicien invalide'),
+  body('internal_notes').optional().trim(),
+  validate,
+];

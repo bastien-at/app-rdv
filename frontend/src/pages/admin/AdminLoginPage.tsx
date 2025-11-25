@@ -12,6 +12,7 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [rememberMe, setRememberMe] = useState(true);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,7 +21,36 @@ export default function AdminLoginPage() {
 
     try {
       const token = await adminLogin(email, password);
-      localStorage.setItem('admin_token', token);
+
+      const persistentStorage = rememberMe ? localStorage : sessionStorage;
+      const ephemeralStorage = rememberMe ? sessionStorage : localStorage;
+
+      // Nettoyer l'autre stockage pour éviter les incohérences
+      ephemeralStorage.removeItem('admin_token');
+      ephemeralStorage.removeItem('admin_email');
+      ephemeralStorage.removeItem('admin_role');
+      ephemeralStorage.removeItem('admin_store_id');
+
+      // Stocker le token et l'email dans le stockage choisi
+      persistentStorage.setItem('admin_token', token);
+      persistentStorage.setItem('admin_email', email);
+
+      // Décoder le JWT pour récupérer le rôle et le store_id
+      try {
+        const [, payloadBase64] = token.split('.');
+        const payloadJson = atob(payloadBase64);
+        const payload = JSON.parse(payloadJson) as { role?: string; store_id?: string | null };
+        if (payload.role) {
+          persistentStorage.setItem('admin_role', payload.role);
+        }
+        if (payload.store_id) {
+          persistentStorage.setItem('admin_store_id', payload.store_id);
+        } else {
+          persistentStorage.removeItem('admin_store_id');
+        }
+      } catch {
+        // en cas d'erreur de décodage, on continue simplement
+      }
       navigate('/admin/dashboard');
     } catch (err) {
       setError('Email ou mot de passe incorrect');
@@ -32,18 +62,22 @@ export default function AdminLoginPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Bike className="h-12 w-12 text-blue-500 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Espace Professionnel
-          </h1>
-          <p className="text-gray-600">
-            Connectez-vous pour gérer vos réservations
-          </p>
-        </div>
-
         <Card>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="text-center mb-6">
+            <img
+              src="/assets/alltricks-logo.svg"
+              alt="Alltricks"
+              className="h-10 w-auto mx-auto mb-3"
+            />
+            <h1 className="text-xl font-bold text-gray-900 mb-1">
+              Espace Professionnel
+            </h1>
+            <p className="text-sm text-gray-600">
+              Connectez-vous avec votre compte magasin Alltricks
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
             <Input
               label="Email"
               type="email"
@@ -62,6 +96,24 @@ export default function AdminLoginPage() {
               placeholder="••••••••"
             />
 
+            <div className="flex items-center justify-between text-sm">
+              <label className="flex items-center gap-2 text-gray-600">
+                <input
+                  type="checkbox"
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                />
+                <span>Rester connecté</span>
+              </label>
+              <button
+                type="button"
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Mot de passe oublié ?
+              </button>
+            </div>
+
             {error && (
               <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600">
                 {error}
@@ -73,7 +125,7 @@ export default function AdminLoginPage() {
               fullWidth
               loading={loading}
             >
-              Se connecter
+              Me connecter
             </Button>
           </form>
         </Card>

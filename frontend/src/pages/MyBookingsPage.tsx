@@ -60,8 +60,8 @@ export default function MyBookingsPage() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { variant: 'success' | 'warning' | 'error' | 'info', label: string }> = {
-      confirmed: { variant: 'success', label: 'Confirmé' },
-      pending: { variant: 'warning', label: 'En attente' },
+      confirmed: { variant: 'success', label: 'Confirmé (client notifié)' },
+      pending: { variant: 'warning', label: 'En attente validation' },
       cancelled: { variant: 'error', label: 'Annulé' },
       completed: { variant: 'info', label: 'Terminé' },
     };

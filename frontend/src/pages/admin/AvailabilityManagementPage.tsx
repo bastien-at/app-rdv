@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, Clock, Plus, Trash2, Edit2, Save, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import Layout from '../../components/Layout';
+import AdminLayout from '../../components/admin/AdminLayout';
 import Card from '../../components/Card';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
@@ -60,15 +60,22 @@ export default function AvailabilityManagementPage() {
 
   const loadStores = async () => {
     try {
-      // TODO: Remplacer par l'appel API réel
-      const mockStores: Store[] = [
-        { id: '1', name: 'Alltricks Paris' },
-        { id: '2', name: 'Alltricks Lyon' },
-        { id: '3', name: 'Alltricks Marseille' },
-      ];
-      setStores(mockStores);
-      if (mockStores.length > 0) {
-        setSelectedStore(mockStores[0].id);
+      const response = await fetch('/api/stores', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur API magasins');
+      }
+
+      const json = await response.json();
+      const data: Store[] = json.data || [];
+
+      setStores(data);
+      if (data.length > 0) {
+        setSelectedStore(data[0].id);
       }
     } catch (error) {
       console.error('Erreur chargement magasins:', error);
@@ -78,23 +85,25 @@ export default function AvailabilityManagementPage() {
   const loadBlocks = async () => {
     setLoading(true);
     try {
-      // TODO: Remplacer par l'appel API réel
-      // const response = await fetch(`/api/admin/stores/${selectedStore}/availability-blocks`, {
-      //   headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}` }
-      // });
-      // const data = await response.json();
-      
-      const mockBlocks: AvailabilityBlock[] = [
-        {
-          id: '1',
-          store_id: selectedStore,
-          start_datetime: new Date(Date.now() + 86400000 * 7).toISOString(),
-          end_datetime: new Date(Date.now() + 86400000 * 14).toISOString(),
-          reason: 'Congés annuels',
-          block_type: 'holiday',
+      if (!selectedStore) {
+        setBlocks([]);
+        return;
+      }
+
+      const response = await fetch(`/api/admin/stores/${selectedStore}/availability-blocks`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
         },
-      ];
-      setBlocks(mockBlocks);
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur API blocages');
+      }
+
+      const json = await response.json();
+      const data: AvailabilityBlock[] = json.data || [];
+
+      setBlocks(data);
     } catch (error) {
       console.error('Erreur chargement blocages:', error);
     } finally {
@@ -107,7 +116,7 @@ export default function AvailabilityManagementPage() {
       const start_datetime = `${formData.start_date}T${formData.start_time}:00`;
       const end_datetime = `${formData.end_date}T${formData.end_time}:00`;
 
-      const newBlock: AvailabilityBlock = {
+      const newBlock: Omit<AvailabilityBlock, 'id'> = {
         store_id: selectedStore,
         start_datetime,
         end_datetime,
@@ -115,20 +124,22 @@ export default function AvailabilityManagementPage() {
         block_type: formData.block_type,
       };
 
-      // TODO: Appel API
-      // const response = await fetch('/api/admin/availability-blocks', {
-      //   method: 'POST',
-      //   headers: {
-      //     'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
-      //     'Content-Type': 'application/json'
-      //   },
-      //   body: JSON.stringify(newBlock)
-      // });
+      const response = await fetch('/api/admin/availability-blocks', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(newBlock),
+      });
 
-      console.log('Nouveau blocage:', newBlock);
+      if (!response.ok) {
+        throw new Error('Erreur API création blocage');
+      }
+
       setShowAddModal(false);
       resetForm();
-      loadBlocks();
+      await loadBlocks();
     } catch (error) {
       console.error('Erreur création blocage:', error);
       alert('Erreur lors de la création du blocage');
@@ -139,14 +150,18 @@ export default function AvailabilityManagementPage() {
     if (!confirm('Êtes-vous sûr de vouloir supprimer ce blocage ?')) return;
 
     try {
-      // TODO: Appel API
-      // await fetch(`/api/admin/availability-blocks/${blockId}`, {
-      //   method: 'DELETE',
-      //   headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}` }
-      // });
+      const response = await fetch(`/api/admin/availability-blocks/${blockId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+        },
+      });
 
-      console.log('Suppression blocage:', blockId);
-      loadBlocks();
+      if (!response.ok) {
+        throw new Error('Erreur API suppression blocage');
+      }
+
+      await loadBlocks();
     } catch (error) {
       console.error('Erreur suppression blocage:', error);
       alert('Erreur lors de la suppression du blocage');
@@ -188,8 +203,8 @@ export default function AvailabilityManagementPage() {
   };
 
   return (
-    <Layout showHeader={false}>
-      <div className="min-h-screen bg-gray-50">
+    <AdminLayout>
+      <div className="overflow-y-auto h-full bg-gray-50">
         {/* Header */}
         <header className="bg-white border-b border-gray-200">
           <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -393,6 +408,6 @@ export default function AvailabilityManagementPage() {
           </div>
         )}
       </div>
-    </Layout>
+    </AdminLayout>
   );
 }

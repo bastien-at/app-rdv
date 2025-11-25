@@ -30,12 +30,55 @@ export interface DaySchedule {
 
 export interface Service {
   id: string;
-  store_id: string;
+  store_id: string | null;
+  service_type: 'fitting' | 'workshop';
   name: string;
   description?: string;
   duration_minutes: number;
   price: number;
+  category?: string;
+  image_url?: string;
+  is_global: boolean;
   active: boolean;
+  updated_by?: string;
+  created_at: string;
+  updated_at: string;
+  store_name?: string;
+  store_city?: string;
+}
+
+export interface ServiceHistory {
+  id: string;
+  service_id: string;
+  action: 'created' | 'updated' | 'deleted' | 'activated' | 'deactivated';
+  changed_fields?: Record<string, { old: any; new: any }>;
+  changed_by?: string;
+  changed_at: string;
+  snapshot?: Service;
+}
+
+export interface CreateServiceData {
+  store_id?: string;
+  service_type: 'fitting' | 'workshop';
+  name: string;
+  description?: string;
+  duration_minutes: number;
+  price: number;
+  category?: string;
+  image_url?: string;
+  is_global?: boolean;
+  active?: boolean;
+}
+
+export interface UpdateServiceData {
+  name?: string;
+  description?: string;
+  duration_minutes?: number;
+  price?: number;
+  category?: string;
+  image_url?: string;
+  is_global?: boolean;
+  active?: boolean;
 }
 
 export interface TimeSlot {
@@ -92,6 +135,48 @@ export interface Booking {
   technician_name?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface Admin {
+  id: string;
+  email: string;
+  name: string;
+  store_id: string | null;
+  role: 'super_admin' | 'store_admin';
+  active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface AdminWithStore extends Admin {
+  store: Store;
+}
+
+export interface CreateAdminData {
+  email: string;
+  name: string;
+  store_id?: string;
+  role: 'super_admin' | 'store_admin';
+  active?: boolean;
+}
+
+export interface UpdateAdminData {
+  email?: string;
+  name?: string;
+  store_id?: string;
+  role?: 'super_admin' | 'store_admin';
+  active?: boolean;
+}
+
+export interface CreateStoreData {
+  name: string;
+  address: string;
+  city: string;
+  postal_code: string;
+  phone: string;
+  email: string;
+  opening_hours: OpeningHours;
+  active?: boolean;
 }
 
 export interface ApiResponse<T = any> {

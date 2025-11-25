@@ -33,20 +33,7 @@ export const calculateAvailableSlots = async (
   
   const service = serviceResult.rows[0];
   
-  // 2. Vérifier les contraintes de réservation
-  const now = new Date();
-  const minBookingDate = addDays(now, parseInt(process.env.MIN_BOOKING_HOURS || '48') / 24);
-  const maxBookingDate = addMonths(now, parseInt(process.env.MAX_BOOKING_MONTHS || '3'));
-  
-  if (isBefore(date, minBookingDate)) {
-    return []; // Trop tôt pour réserver
-  }
-  
-  if (isAfter(date, maxBookingDate)) {
-    return []; // Trop tard pour réserver
-  }
-  
-  // 3. Récupérer les horaires d'ouverture pour ce jour
+  // 2. Récupérer les horaires d'ouverture pour ce jour
   const dayName = format(date, 'EEEE').toLowerCase() as keyof typeof store.opening_hours;
   const daySchedule: DaySchedule = store.opening_hours[dayName];
   
@@ -59,6 +46,7 @@ export const calculateAvailableSlots = async (
   const closeTime = parse(daySchedule.close, 'HH:mm', date);
   const bufferMinutes = parseInt(process.env.BUFFER_MINUTES || '15');
   const slotDuration = service.duration_minutes + bufferMinutes;
+  
   
   const allSlots: TimeSlot[] = [];
   let currentTime = openTime;
@@ -108,56 +96,52 @@ export const calculateAvailableSlots = async (
   
   const locks = locksResult.rows;
   
-  // 8. Filtrer les créneaux disponibles
+  // 8. Filtrer les créneaux disponibles - VERSION SIMPLIFIÉE
   const availableSlots = allSlots.map(slot => {
+    // Si pas de réservations, pas de blocages, pas de locks -> créneau disponible
+    if (existingBookings.length === 0 && blocks.length === 0 && locks.length === 0) {
+      return { ...slot, available: true };
+    }
+    
     const slotStart = new Date(slot.start_datetime);
     const slotEnd = new Date(slot.end_datetime);
     const slotEndWithBuffer = addMinutes(slotEnd, bufferMinutes);
     
-    // Vérifier si le créneau est dans le passé
-    if (isBefore(slotStart, now)) {
-      return { ...slot, available: false };
-    }
-    
     // Vérifier les réservations existantes
-    const hasBookingConflict = existingBookings.filter((booking: any) => {
+    const hasBookingConflict = existingBookings.some((booking: any) => {
       const bookingStart = new Date(booking.start_datetime);
-      const bookingEnd = addMinutes(new Date(booking.end_datetime), bufferMinutes);
+      const bookingEnd = new Date(booking.end_datetime);
       
       return (
-        isWithinInterval(slotStart, { start: bookingStart, end: bookingEnd }) ||
-        isWithinInterval(slotEnd, { start: bookingStart, end: bookingEnd }) ||
-        isWithinInterval(bookingStart, { start: slotStart, end: slotEndWithBuffer })
+        slotStart < bookingEnd && slotEndWithBuffer > bookingStart
       );
-    }).length > 0;
+    });
     
     if (hasBookingConflict) {
       return { ...slot, available: false };
     }
     
     // Vérifier les blocages
-    const hasBlockConflict = blocks.filter((block: any) => {
+    const hasBlockConflict = blocks.some((block: any) => {
       const blockStart = new Date(block.start_datetime);
       const blockEnd = new Date(block.end_datetime);
       
       return (
-        isWithinInterval(slotStart, { start: blockStart, end: blockEnd }) ||
-        isWithinInterval(slotEnd, { start: blockStart, end: blockEnd })
+        slotStart < blockEnd && slotEnd > blockStart
       );
-    }).length > 0;
+    });
     
     if (hasBlockConflict) {
       return { ...slot, available: false };
     }
     
     // Vérifier les locks
-    const hasLockConflict = locks.filter((lock: any) => {
+    const hasLockConflict = locks.some((lock: any) => {
       const lockStart = new Date(lock.start_datetime);
       const lockEnd = new Date(lock.end_datetime);
       
       return (
-        isWithinInterval(slotStart, { start: lockStart, end: lockEnd }) ||
-        isWithinInterval(slotEnd, { start: lockStart, end: lockEnd })
+        slotStart < lockEnd && slotEnd > lockStart
       );
     });
     
@@ -165,7 +149,7 @@ export const calculateAvailableSlots = async (
       return { ...slot, available: false };
     }
     
-    return slot;
+    return { ...slot, available: true };
   });
   
   return availableSlots;
@@ -207,9 +191,14 @@ export const isSlotAvailable = async (
   startDatetime: Date
 ): Promise<boolean> => {
   const slots = await calculateAvailableSlots(storeId, serviceId, startDatetime);
-  const requestedSlot = slots.find(slot => 
-    new Date(slot.start_datetime).getTime() === startDatetime.getTime()
-  );
+  
+  // Chercher un créneau qui correspond (avec une tolérance de 1 minute)
+  const requestedTime = startDatetime.getTime();
+  const requestedSlot = slots.find(slot => {
+    const slotTime = new Date(slot.start_datetime).getTime();
+    const timeDiff = Math.abs(slotTime - requestedTime);
+    return timeDiff < 60000; // Moins d'une minute de différence
+  });
   
   return requestedSlot?.available || false;
 };
