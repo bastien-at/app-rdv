@@ -82,7 +82,7 @@ export default function ModernStoresPage() {
           {/* Header avec logo */}
           <div className="flex items-center justify-between mb-10">
             <img
-              src="/assets/alltricks-logo.svg"
+              src="/assets/logo_alltricks.png"
               alt="Alltricks"
               className="h-14 w-auto opacity-90 hover:opacity-100 transition-opacity cursor-pointer"
               onClick={() => navigate('/')}

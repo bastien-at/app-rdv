@@ -416,9 +416,9 @@ const seed = async () => {
     }
 
     // 5. Créer quelques réservations d'exemple
-    console.log('📅 Création de réservations d\'exemple...');
+    console.log("📅 Création de réservations d'exemple...");
 
-    // On va créer des réservations entre le 01/12 et le 07/12 (année courante)
+    // On va d'abord créer des réservations génériques entre le 01/12 et le 07/12 (année courante)
     const currentYear = new Date().getFullYear();
 
     // Récupérer des services d'étude posturale et des techniciens pour plusieurs magasins
@@ -504,6 +504,185 @@ const seed = async () => {
       }
 
       console.log('  ✓ Réservations de démo créées pour plusieurs magasins (01/12 au 07/12)');
+
+      // Ensuite, créer des réservations de démo spécifiques pour Issy-les-Moulineaux
+      const issyIndex = stores.findIndex((s) => s.city === 'Issy-les-Moulineaux');
+      if (issyIndex !== -1) {
+        const issyStoreId = storeIds[issyIndex];
+
+        // Récupérer au moins un service fitting et plusieurs services workshop pour Issy
+        const issyServicesResult = await query(
+          'SELECT id, duration_minutes, service_type FROM services WHERE store_id = $1 AND service_type IN ($2, $3)',
+          [issyStoreId, 'fitting', 'workshop'],
+        );
+        const issyTechResult = await query(
+          'SELECT id FROM technicians WHERE store_id = $1 LIMIT 1',
+          [issyStoreId],
+        );
+
+        if (issyServicesResult.rows.length > 0 && issyTechResult.rows.length > 0) {
+          const issyServices = issyServicesResult.rows as any[];
+          const fittingService = issyServices.find((s) => s.service_type === 'fitting');
+          const workshopServices = issyServices.filter((s) => s.service_type === 'workshop');
+
+          if (!fittingService && workshopServices.length === 0) {
+            console.warn('⚠️ Aucun service fitting ou workshop trouvé pour Issy-les-Moulineaux');
+          } else {
+            const issyTech = issyTechResult.rows[0];
+
+            const today = new Date();
+
+            // Créer des créneaux sur les 14 prochains jours (~3 créneaux par jour ouvré)
+            // en alternant fitting et différents workshops pour avoir des durées variées
+            for (let offset = 0; offset < 14; offset++) {
+              const dayDate = new Date(today);
+              dayDate.setDate(today.getDate() + offset);
+
+              const dayOfWeek = dayDate.getDay();
+              // 0 = dimanche, on saute pour rester cohérent avec le front qui masque les dimanches
+              if (dayOfWeek === 0) continue;
+
+              const hours = [10, 13, 16];
+
+              for (let i = 0; i < hours.length; i++) {
+                const start = new Date(
+                  dayDate.getFullYear(),
+                  dayDate.getMonth(),
+                  dayDate.getDate(),
+                  hours[i],
+                  0,
+                  0,
+                  0,
+                );
+
+                // Alterner fitting et ateliers :
+                // - premier créneau : fitting (si dispo)
+                // - suivants : différents services workshop, avec leurs durées propres
+                let chosenService: any | null = null;
+                if (i === 0 && fittingService) {
+                  chosenService = fittingService;
+                } else if (workshopServices.length > 0) {
+                  const idx = (offset + i) % workshopServices.length;
+                  chosenService = workshopServices[idx];
+                } else if (fittingService) {
+                  chosenService = fittingService;
+                }
+
+                if (!chosenService) {
+                  continue;
+                }
+
+                const end = new Date(start);
+                end.setMinutes(end.getMinutes() + chosenService.duration_minutes);
+
+                const status = demoStatuses[(offset + i) % demoStatuses.length];
+
+                await query(
+                  `INSERT INTO bookings (
+                    booking_token, store_id, service_id, technician_id,
+                    start_datetime, end_datetime, status,
+                    customer_firstname, customer_lastname, customer_email, customer_phone,
+                    customer_data
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                  [
+                    generateBookingToken(),
+                    issyStoreId,
+                    chosenService.id,
+                    issyTech.id,
+                    start,
+                    end,
+                    status,
+                    'Client',
+                    `Issy-${offset + 1}-${i + 1}`,
+                    `client.issy+${offset + 1}${i + 1}@example.com`,
+                    '0612345678',
+                    JSON.stringify({
+                      height: 178,
+                      weight: 72,
+                      shoe_size: 42,
+                      practice_frequency: 'Hebdomadaire',
+                      bike_info: 'Vélo route / ville',
+                    }),
+                  ],
+                );
+              }
+            }
+
+            // Créer une journée complète pour le 03/12 (année courante) à Issy-les-Moulineaux
+            const fullDayYear = currentYear;
+            const fullDayDate = new Date(fullDayYear, 11, 3, 0, 0, 0, 0); // 3 décembre
+            const fullDayOfWeek = fullDayDate.getDay();
+
+            if (fullDayOfWeek !== 0) { // éviter dimanche, même si ce n'est normalement pas le cas
+              const fullDayHours = [10, 11, 12, 13, 14, 15, 16, 17, 18];
+
+              for (let i = 0; i < fullDayHours.length; i++) {
+                const hour = fullDayHours[i];
+                const start = new Date(fullDayYear, 11, 3, hour, 0, 0, 0);
+
+                let chosenService: any | null = null;
+                if (i % 2 === 0 && fittingService) {
+                  // un créneau fitting sur deux
+                  chosenService = fittingService;
+                } else if (workshopServices.length > 0) {
+                  const idx = i % workshopServices.length;
+                  chosenService = workshopServices[idx];
+                } else if (fittingService) {
+                  chosenService = fittingService;
+                }
+
+                if (!chosenService) {
+                  continue;
+                }
+
+                const end = new Date(start);
+                end.setMinutes(end.getMinutes() + chosenService.duration_minutes);
+
+                const status = demoStatuses[i % demoStatuses.length];
+
+                await query(
+                  `INSERT INTO bookings (
+                    booking_token, store_id, service_id, technician_id,
+                    start_datetime, end_datetime, status,
+                    customer_firstname, customer_lastname, customer_email, customer_phone,
+                    customer_data
+                  ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                  [
+                    generateBookingToken(),
+                    issyStoreId,
+                    chosenService.id,
+                    issyTech.id,
+                    start,
+                    end,
+                    status,
+                    'Client',
+                    `Issy-full-03-12-${i + 1}`,
+                    `client.issy.full0312+${i + 1}@example.com`,
+                    '0612345678',
+                    JSON.stringify({
+                      height: 178,
+                      weight: 72,
+                      shoe_size: 42,
+                      practice_frequency: 'Hebdomadaire',
+                      bike_info: 'Vélo route / ville',
+                    }),
+                  ],
+                );
+              }
+
+              console.log('  ✓ Journée complète de démo créée pour Issy-les-Moulineaux le 03/12');
+            }
+
+            console.log(
+              '  ✓ Réservations de démo (fitting + atelier) créées pour Issy-les-Moulineaux sur les 2 prochaines semaines + journée complète du 03/12',
+            );
+          }
+        } else {
+          console.warn(
+            '⚠️ Impossible de créer les réservations de démo pour Issy-les-Moulineaux (service ou technicien manquant)',
+          );
+        }
+      }
     }
 
     console.log('\n✅ Seeding terminé avec succès!');

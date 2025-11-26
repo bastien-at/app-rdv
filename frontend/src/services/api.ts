@@ -24,6 +24,11 @@ const api = axios.create({
   },
 });
 
+export const getAdminToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token');
+};
+
 // Stores
 export const getStores = async (): Promise<Store[]> => {
   const { data } = await api.get<ApiResponse<Store[]>>('/stores');
@@ -41,7 +46,7 @@ export const getStoreBySlug = async (slug: string): Promise<Store> => {
 };
 
 export const createStore = async (storeData: CreateStoreData): Promise<Store> => {
-  const token = localStorage.getItem('admin_token');
+  const token = getAdminToken();
   const { data } = await api.post<ApiResponse<Store>>('/admin/stores', storeData, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -93,7 +98,7 @@ export const adminLogin = async (email: string, password: string): Promise<strin
 };
 
 export const getAllBookings = async (): Promise<Booking[]> => {
-  const token = localStorage.getItem('admin_token');
+  const token = getAdminToken();
   const { data } = await api.get<ApiResponse<Booking[]>>('/admin/bookings', {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -113,7 +118,7 @@ export const adminConfirmBooking = async (
   id: string,
   payload: AdminConfirmBookingPayload = {},
 ): Promise<Booking> => {
-  const token = localStorage.getItem('admin_token');
+  const token = getAdminToken();
   const { data } = await api.put<ApiResponse<Booking>>(
     `/admin/bookings/${id}/confirm`,
     payload,
@@ -124,6 +129,122 @@ export const adminConfirmBooking = async (
     },
   );
   return data.data!;
+};
+
+// Etat des lieux (réception)
+export const saveReceptionReport = async (
+  bookingId: string,
+  report: any,
+): Promise<void> => {
+  const token = getAdminToken();
+  await api.post(`/admin/bookings/${bookingId}/reception-report`, report, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+};
+
+// Inspection (état des lieux) détaillée
+export const createOrUpdateInspectionApi = async (
+  bookingId: string,
+  comments: string,
+): Promise<any> => {
+  const token = getAdminToken();
+  const { data } = await api.post<ApiResponse<any>>(
+    `/bookings/${bookingId}/inspection`,
+    { comments },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+  return data.data;
+};
+
+export const uploadInspectionPhotosApi = async (
+  inspectionId: string,
+  files: File[],
+): Promise<void> => {
+  if (files.length === 0) return;
+  const token = getAdminToken();
+  const formData = new FormData();
+  files.slice(0, 5).forEach((file) => {
+    formData.append('photos', file);
+  });
+
+  await api.post(`/inspections/${inspectionId}/photos`, formData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'multipart/form-data',
+    },
+  });
+};
+
+export const sendInspectionApi = async (inspectionId: string): Promise<void> => {
+  const token = getAdminToken();
+  await api.post(`/inspections/${inspectionId}/send`, null, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+};
+
+export const getInspectionByBookingApi = async (bookingId: string): Promise<any | null> => {
+  const token = getAdminToken();
+  try {
+    const { data } = await api.get<ApiResponse<any>>(`/bookings/${bookingId}/inspection`, {
+      headers: token
+        ? {
+            Authorization: `Bearer ${token}`,
+          }
+        : undefined,
+    });
+    return data.data || null;
+  } catch (error: any) {
+    // 404 = aucune inspection encore créée, ce n'est pas bloquant
+    if (error?.response?.status === 404) {
+      return null;
+    }
+    throw error;
+  }
+};
+
+export interface ReceptionReportPayload {
+  inspectionId?: string;
+  technicianId?: string;
+  workPerformed?: string;
+  partsReplaced?: string;
+  recommendations?: string;
+  laborCost?: number;
+  partsCost?: number;
+  totalCost?: number;
+}
+
+export const createOrUpdateReceptionReportApi = async (
+  bookingId: string,
+  payload: ReceptionReportPayload,
+): Promise<any> => {
+  const token = getAdminToken();
+  const { data } = await api.post<ApiResponse<any>>(
+    `/bookings/${bookingId}/reception-report`,
+    payload,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+  return data.data;
+};
+
+export const sendReceptionReportApi = async (reportId: string): Promise<void> => {
+  const token = getAdminToken();
+  await api.post(`/reception-reports/${reportId}/send`, null, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 };
 
 // Services Management
@@ -143,7 +264,7 @@ export const getServiceById = async (id: string): Promise<Service> => {
 };
 
 export const createService = async (serviceData: CreateServiceData): Promise<Service> => {
-  const token = localStorage.getItem('admin_token');
+  const token = getAdminToken();
   const { data } = await api.post<ApiResponse<Service>>('/services', serviceData, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -153,7 +274,7 @@ export const createService = async (serviceData: CreateServiceData): Promise<Ser
 };
 
 export const updateService = async (id: string, serviceData: UpdateServiceData): Promise<Service> => {
-  const token = localStorage.getItem('admin_token');
+  const token = getAdminToken();
   const { data } = await api.put<ApiResponse<Service>>(`/services/${id}`, serviceData, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -163,7 +284,7 @@ export const updateService = async (id: string, serviceData: UpdateServiceData):
 };
 
 export const deleteService = async (id: string): Promise<void> => {
-  const token = localStorage.getItem('admin_token');
+  const token = getAdminToken();
   await api.delete(`/services/${id}`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -172,7 +293,7 @@ export const deleteService = async (id: string): Promise<void> => {
 };
 
 export const getServiceHistory = async (id: string): Promise<ServiceHistory[]> => {
-  const token = localStorage.getItem('admin_token');
+  const token = getAdminToken();
   const { data } = await api.get<ApiResponse<ServiceHistory[]>>(`/services/${id}/history`, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -188,7 +309,7 @@ export const getServiceCategories = async (): Promise<string[]> => {
 
 // Admin management (super admin only)
 export const getAdmins = async (): Promise<AdminWithStore[]> => {
-  const token = localStorage.getItem('admin_token');
+  const token = getAdminToken();
   const { data } = await api.get<ApiResponse<AdminWithStore[]>>('/admin/admins', {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -198,7 +319,7 @@ export const getAdmins = async (): Promise<AdminWithStore[]> => {
 };
 
 export const createAdmin = async (adminData: CreateAdminData): Promise<AdminWithStore> => {
-  const token = localStorage.getItem('admin_token');
+  const token = getAdminToken();
   const { data } = await api.post<ApiResponse<AdminWithStore>>('/admin/admins', adminData, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -208,7 +329,7 @@ export const createAdmin = async (adminData: CreateAdminData): Promise<AdminWith
 };
 
 export const updateAdmin = async (id: string, adminData: UpdateAdminData): Promise<AdminWithStore> => {
-  const token = localStorage.getItem('admin_token');
+  const token = getAdminToken();
   const { data } = await api.put<ApiResponse<AdminWithStore>>(`/admin/admins/${id}`, adminData, {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -218,7 +339,7 @@ export const updateAdmin = async (id: string, adminData: UpdateAdminData): Promi
 };
 
 export const deleteAdminApi = async (id: string): Promise<void> => {
-  const token = localStorage.getItem('admin_token');
+  const token = getAdminToken();
   await api.delete(`/admin/admins/${id}`, {
     headers: {
       Authorization: `Bearer ${token}`,

@@ -30,7 +30,7 @@ export default function HeroSection({ store, onScrollToServices }: HeroSectionPr
       {/* Logo Alltricks */}
       <div className="absolute top-8 left-8 z-20">
         <img 
-          src="/assets/alltricks-logo.svg" 
+          src="/assets/logo_alltricks.png" 
           alt="Alltricks" 
           className="h-16 w-auto opacity-90 hover:opacity-100 transition-opacity"
         />

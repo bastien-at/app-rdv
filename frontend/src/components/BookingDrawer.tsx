@@ -4,7 +4,17 @@ import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Button from './Button';
 import { Booking, Service } from '../types';
-import { adminConfirmBooking, AdminConfirmBookingPayload, getStoreServices } from '../services/api';
+import { 
+  adminConfirmBooking, 
+  AdminConfirmBookingPayload, 
+  getStoreServices, 
+  createOrUpdateInspectionApi, 
+  uploadInspectionPhotosApi, 
+  sendInspectionApi,
+  getInspectionByBookingApi,
+  createOrUpdateReceptionReportApi,
+  sendReceptionReportApi,
+} from '../services/api';
 
 interface BookingDrawerProps {
   isOpen: boolean;
@@ -22,6 +32,15 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
   const [editableServiceId, setEditableServiceId] = useState<string | undefined>(undefined);
   const [editableDate, setEditableDate] = useState<string>('');
   const [editableTime, setEditableTime] = useState<string>('');
+  const [receptionNotes, setReceptionNotes] = useState<string>('');
+  const [receptionPhotos, setReceptionPhotos] = useState<File[]>([]);
+  const [receptionSaving, setReceptionSaving] = useState(false);
+  const [inspectionLoading, setInspectionLoading] = useState(false);
+  const [inspectionComments, setInspectionComments] = useState<string>('');
+  const [inspectionPhotos, setInspectionPhotos] = useState<{ id: string; photo_url: string }[]>([]);
+  const [reportNotes, setReportNotes] = useState<string>('');
+  const [reportPhotos, setReportPhotos] = useState<File[]>([]);
+  const [reportSaving, setReportSaving] = useState(false);
 
   useEffect(() => {
     if (!booking) return;
@@ -31,6 +50,14 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
     const start = parseISO(booking.start_datetime);
     setEditableDate(start.toISOString().slice(0, 10));
     setEditableTime(format(start, 'HH:mm'));
+
+    // Réinitialiser les états d'inspection / PV lorsqu'on change de réservation
+    setReceptionNotes('');
+    setReceptionPhotos([]);
+    setInspectionComments('');
+    setInspectionPhotos([]);
+    setReportNotes('');
+    setReportPhotos([]);
 
     // Charger les services du magasin uniquement pour les réservations en attente
     if (booking.status === 'pending' && booking.store_id) {
@@ -57,6 +84,63 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
       case 'completed': return 'bg-blue-100 text-blue-700 border-blue-200';
       case 'cancelled': return 'bg-red-100 text-red-700 border-red-200';
       default: return 'bg-gray-100 text-gray-700 border-gray-200';
+    }
+  };
+
+  const openInspectionReportModal = async () => {
+    if (!booking) return;
+    setInspectionLoading(true);
+    setShowInspectionReport(true);
+    try {
+      const inspection = await getInspectionByBookingApi(booking.id);
+      if (inspection) {
+        setInspectionComments(inspection.comments || '');
+        if (inspection.photos && Array.isArray(inspection.photos)) {
+          setInspectionPhotos(
+            inspection.photos.map((p: any) => ({ id: String(p.id), photo_url: p.photo_url }))
+          );
+        }
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement de l'inspection:", error);
+    } finally {
+      setInspectionLoading(false);
+    }
+  };
+
+  const handleSaveReceptionReportAndSend = async () => {
+    if (!booking) return;
+
+    setReportSaving(true);
+    try {
+      // On réutilise l'inspection existante ou on en crée une si besoin pour associer d'éventuelles nouvelles photos
+      let inspection = await getInspectionByBookingApi(booking.id);
+      if (!inspection) {
+        inspection = await createOrUpdateInspectionApi(booking.id, inspectionComments || '');
+      }
+
+      if (inspection && inspection.id && reportPhotos.length > 0) {
+        await uploadInspectionPhotosApi(inspection.id, reportPhotos);
+      }
+
+      const report = await createOrUpdateReceptionReportApi(booking.id, {
+        inspectionId: inspection?.id,
+        workPerformed: reportNotes || undefined,
+      });
+
+      if (report && report.id) {
+        await sendReceptionReportApi(report.id);
+      }
+
+      setShowInspectionReport(false);
+      if (onUpdate) {
+        onUpdate();
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'enregistrement du PV d'intervention:", error);
+      alert("Erreur lors de l'enregistrement / l'envoi du PV d'intervention");
+    } finally {
+      setReportSaving(false);
     }
   };
 
@@ -117,6 +201,30 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
       case 'confirmed': return <CheckCircle className="h-4 w-4" />;
       case 'cancelled': return <XCircle className="h-4 w-4" />;
       default: return <Clock className="h-4 w-4" />;
+    }
+  };
+
+  const handleSaveReceptionReport = async () => {
+    if (!booking) return;
+
+    setReceptionSaving(true);
+    try {
+      const inspection = await createOrUpdateInspectionApi(booking.id, receptionNotes || '');
+      if (inspection && inspection.id) {
+        if (receptionPhotos.length > 0) {
+          await uploadInspectionPhotosApi(inspection.id, receptionPhotos);
+        }
+        await sendInspectionApi(inspection.id);
+      }
+      setShowReceptionReport(false);
+      if (onUpdate) {
+        onUpdate();
+      }
+    } catch (error) {
+      console.error("Erreur lors de l'enregistrement de l'état des lieux:", error);
+      alert("Erreur lors de l'enregistrement de l'état des lieux");
+    } finally {
+      setReceptionSaving(false);
     }
   };
 
@@ -369,7 +477,7 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
               <Button
                 variant="ghost"
                 className="border-2 border-gray-300 hover:border-green-500 hover:bg-green-50 hover:text-green-600"
-                onClick={() => setShowInspectionReport(true)}
+                onClick={openInspectionReportModal}
               >
                 <FileText className="h-4 w-4 mr-2" />
                 PV d'intervention
@@ -391,6 +499,12 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
                 fullWidth
                 variant="ghost"
                 className="border-2 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-500"
+                onClick={() => {
+                  if (window.confirm('Êtes-vous sûr de vouloir annuler cette réservation ?')) {
+                    // TODO: Appeler l'API d'annulation ici
+                    console.log('Annulation de la réservation:', booking.id);
+                  }
+                }}
               >
                 <XCircle className="h-4 w-4 mr-2" />
                 Annuler la réservation
@@ -433,7 +547,7 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
         </div>
       </div>
 
-      {/* Modals pour état des lieux et PV (à implémenter) */}
+      {/* Modals pour état des lieux et PV */}
       {showReceptionReport && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
           <div className="bg-white rounded-2xl p-6 max-w-2xl w-full">
@@ -443,23 +557,148 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="text-gray-600 mb-4">Fonctionnalité d'état des lieux à venir...</p>
-            <Button onClick={() => setShowReceptionReport(false)}>Fermer</Button>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Remarques / anomalies constatées</label>
+                <textarea
+                  value={receptionNotes}
+                  onChange={(e) => setReceptionNotes(e.target.value)}
+                  rows={4}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  placeholder="Ex: rayures sur le cadre, jeu dans la direction, pneus usés..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Photos (1 à 5 images, optionnel)</label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    setReceptionPhotos(files.slice(0, 5));
+                  }}
+                  className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+                {receptionPhotos.length > 0 && (
+                  <p className="mt-1 text-xs text-gray-500">
+                    {receptionPhotos.length} photo(s) sélectionnée(s)
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-4">
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowReceptionReport(false)}
+                  fullWidth
+                >
+                  Annuler
+                </Button>
+                <Button
+                  onClick={handleSaveReceptionReport}
+                  fullWidth
+                  disabled={receptionSaving}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {receptionSaving ? 'Enregistrement...' : 'Enregistrer le rapport'}
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
       {showInspectionReport && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-2xl p-6 max-w-2xl w-full">
+          <div className="bg-white rounded-2xl p-6 max-w-3xl w-full">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-bold">PV d'intervention</h3>
               <button onClick={() => setShowInspectionReport(false)} className="p-2 hover:bg-gray-100 rounded-lg">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <p className="text-gray-600 mb-4">Fonctionnalité de PV d'intervention à venir...</p>
-            <Button onClick={() => setShowInspectionReport(false)}>Fermer</Button>
+
+            {inspectionLoading ? (
+              <p className="text-gray-600 mb-4">Chargement de l'état des lieux...</p>
+            ) : (
+              <div className="space-y-6">
+                {/* Rappel de l'état des lieux */}
+                <div className="bg-gray-50 rounded-2xl p-4">
+                  <h4 className="text-sm font-semibold text-gray-800 mb-2">État des lieux enregistré</h4>
+                  {inspectionComments ? (
+                    <p className="text-sm text-gray-700 whitespace-pre-line">{inspectionComments}</p>
+                  ) : (
+                    <p className="text-sm text-gray-500">Aucun commentaire d'état des lieux enregistré.</p>
+                  )}
+
+                  {inspectionPhotos.length > 0 && (
+                    <div className="mt-3 grid grid-cols-3 md:grid-cols-4 gap-2">
+                      {inspectionPhotos.map((photo) => (
+                        <div key={photo.id} className="relative w-full pt-[75%] bg-gray-200 rounded-lg overflow-hidden">
+                          <img
+                            src={photo.photo_url}
+                            alt="Photo état des lieux"
+                            className="absolute inset-0 w-full h-full object-cover"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Commentaire complémentaire */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Commentaire d'intervention (optionnel)</label>
+                  <textarea
+                    value={reportNotes}
+                    onChange={(e) => setReportNotes(e.target.value)}
+                    rows={4}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    placeholder="Détail des travaux effectués, pièces changées, recommandations..."
+                  />
+                </div>
+
+                {/* Photos supplémentaires */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Photos supplémentaires (1 à 5 images, optionnel)</label>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    multiple
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      setReportPhotos(files.slice(0, 5));
+                    }}
+                    className="block w-full text-sm text-gray-700 file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  />
+                  {reportPhotos.length > 0 && (
+                    <p className="mt-1 text-xs text-gray-500">
+                      {reportPhotos.length} photo(s) sélectionnée(s)
+                    </p>
+                  )}
+                </div>
+
+                <div className="flex gap-3 mt-4">
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowInspectionReport(false)}
+                    fullWidth
+                  >
+                    Annuler
+                  </Button>
+                  <Button
+                    onClick={handleSaveReceptionReportAndSend}
+                    fullWidth
+                    disabled={reportSaving}
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {reportSaving ? 'Envoi...' : "Enregistrer et envoyer au client"}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

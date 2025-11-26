@@ -27,6 +27,7 @@ export default function ModernBookingPage() {
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [fullyBookedDates, setFullyBookedDates] = useState<Set<string>>(new Set());
 
   const [formData, setFormData] = useState({
     firstname: '',
@@ -114,6 +115,17 @@ export default function ModernBookingPage() {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
       const slots = await getAvailability(storeId!, selectedService.id, dateStr);
       setAvailableSlots(slots);
+
+      // Mettre à jour les journées complètes
+      setFullyBookedDates(prev => {
+        const next = new Set(prev);
+        if (slots.length > 0 && slots.every(slot => slot.available === false)) {
+          next.add(dateStr);
+        } else {
+          next.delete(dateStr);
+        }
+        return next;
+      });
     } catch (error) {
       console.error('Erreur lors du chargement des disponibilités:', error);
     } finally {
@@ -243,54 +255,20 @@ export default function ModernBookingPage() {
             <ChevronLeft className="h-5 w-5 mr-1" />
             Retour
           </button>
-          <img 
-            src="/assets/alltricks-logo.svg" 
-            alt="Alltricks" 
-            className="h-10 w-auto"
-          />
-        </div>
+            <img 
+              src="/assets/logo_alltricks.png" 
+              alt="Alltricks" 
+              className="h-10 w-auto"
+            />
       </div>
 
-      {/* Layout 2 colonnes */}
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-2 gap-8 max-w-7xl mx-auto">
-          
-          {/* Colonne gauche - Image hero */}
-          <div className="lg:sticky lg:top-8 h-fit">
-            <div className="relative rounded-3xl overflow-hidden shadow-2xl h-[600px]">
-              <img
-                src={getHeroImage()}
-                alt="Service"
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
-              <div className="absolute bottom-0 left-0 right-0 p-8 text-white">
-                <div className="flex items-center gap-2 mb-4">
-                  {serviceType === 'fitting' ? (
-                    <Bike className="h-8 w-8" />
-                  ) : (
-                    <Wrench className="h-8 w-8" />
-                  )}
-                </div>
-                <h1 className="text-4xl font-bold mb-3">
-                  {getHeroTitle()}
-                </h1>
-                <p className="text-lg text-white/90 mb-6">
-                  {getHeroSubtitle()}
-                </p>
-                <div className="flex items-center gap-2 text-sm text-white/80">
-                  <MapPin className="h-4 w-4" />
-                  <span>{store.name} - {store.city}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Colonne droite - Formulaire */}
+      {/* Contenu principal */}
+      <div className="w-full px-4 py-8">
+        <div>
           <div>
             {/* Stepper de progression */}
-            <div className="mb-8">
-              <div className="flex items-center justify-between">
+            <div className="mb-4">
+              <div className="max-w-xl mx-auto flex items-center justify-between">
                 {steps.map((s, index) => (
                   <div key={s.id} className="flex items-center flex-1">
                     <div className="flex flex-col items-center flex-1">
@@ -319,6 +297,25 @@ export default function ModernBookingPage() {
               </div>
             </div>
 
+            {store && (
+              <div className="mb-8 flex justify-center">
+                <div className="inline-flex items-start gap-3 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100 shadow-sm">
+                  <div className="mt-0.5">
+                    <MapPin className="h-4 w-4 text-blue-500" />
+                  </div>
+                  <div className="text-sm text-gray-700">
+                    <div className="font-semibold text-gray-900">
+                      {store.name}
+                    </div>
+                    <div className="text-xs text-gray-600">
+                      {store.address}<br />
+                      {store.postal_code} {store.city}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            </div>
             {/* Contenu selon l'étape */}
             <div className="bg-white rounded-2xl shadow-lg p-8">
               
@@ -326,14 +323,14 @@ export default function ModernBookingPage() {
               {step === 'service' && (
                 <div>
                   <h2 className="text-2xl font-bold mb-6">Choisissez votre service</h2>
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {services.map((service) => (
                       <button
                         key={service.id}
                         onClick={() => handleServiceSelect(service)}
-                        className="w-full text-left p-6 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group"
+                        className="w-full h-full text-left p-6 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group flex flex-col justify-between"
                       >
-                        <div className="flex items-start justify-between">
+                        <div className="flex items-start justify-between gap-4">
                           <div className="flex-1">
                             <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600">
                               {service.name}
@@ -341,17 +338,17 @@ export default function ModernBookingPage() {
                             <p className="text-sm text-gray-600 mb-3">
                               {service.description}
                             </p>
-                            <div className="flex items-center gap-4">
-                              <span className="flex items-center text-sm text-gray-500">
-                                <Clock className="h-4 w-4 mr-1" />
-                                {service.duration_minutes} min
-                              </span>
-                              <span className="text-2xl font-bold text-blue-600">
-                                {service.price}€
-                              </span>
-                            </div>
                           </div>
-                          <ChevronRight className="h-6 w-6 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                          <ChevronRight className="h-6 w-6 text-gray-400 group-hover:text-blue-600 transition-colors flex-shrink-0" />
+                        </div>
+                        <div className="mt-4 flex items-center justify-between gap-4">
+                          <span className="flex items-center text-sm text-gray-500">
+                            <Clock className="h-4 w-4 mr-1" />
+                            {service.duration_minutes} min
+                          </span>
+                          <span className="text-2xl font-bold text-blue-600">
+                            {service.price}€
+                          </span>
                         </div>
                       </button>
                     ))}
@@ -375,19 +372,19 @@ export default function ModernBookingPage() {
                     </button>
                   </div>
 
-                  {/* Calendrier */}
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold text-lg">
-                        {format(currentMonth, 'MMMM yyyy', { locale: fr })}
-                      </h3>
-                      <div className="flex gap-2">
+                  <div className="grid md:grid-cols-2 gap-8 items-start">
+                    {/* Calendrier */}
+                    <div>
+                      <div className="flex items-center justify-between mb-4">
                         <button
                           onClick={previousMonth}
                           className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                         >
                           <ChevronLeft className="h-5 w-5" />
                         </button>
+                        <h3 className="font-semibold text-lg">
+                          {format(currentMonth, 'MMMM yyyy', { locale: fr })}
+                        </h3>
                         <button
                           onClick={nextMonth}
                           className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
@@ -395,43 +392,46 @@ export default function ModernBookingPage() {
                           <ChevronRight className="h-5 w-5" />
                         </button>
                       </div>
+
+                      <div className="grid grid-cols-7 gap-2">
+                        {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, i) => (
+                          <div key={i} className="text-center text-xs font-medium text-gray-500 py-2">
+                            {day}
+                          </div>
+                        ))}
+                        {getDaysInMonth().map((day, i) => {
+                          const isPast = isBefore(day, startOfDay(new Date()));
+                          const isSelected = selectedDate && isSameDay(day, selectedDate);
+                          const isCurrentDay = isToday(day);
+                          const isSunday = day.getDay() === 0;
+                          const dayStr = format(day, 'yyyy-MM-dd');
+                          const isFullyBooked = fullyBookedDates.has(dayStr);
+
+                          const isDisabled = isPast || isSunday || isFullyBooked;
+
+                          return (
+                            <button
+                              key={i}
+                              onClick={() => !isDisabled && handleDateSelect(day)}
+                              disabled={isDisabled}
+                              className={`aspect-square rounded-lg text-sm font-medium transition-all ${
+                                isDisabled
+                                  ? 'text-gray-300 cursor-not-allowed'
+                                  : isSelected
+                                  ? 'bg-blue-600 text-white shadow-lg scale-105'
+                                  : isCurrentDay
+                                  ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
+                                  : 'hover:bg-gray-100 text-gray-700'
+                              }`}
+                            >
+                              {format(day, 'd')}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
 
-                    <div className="grid grid-cols-7 gap-2">
-                      {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, i) => (
-                        <div key={i} className="text-center text-xs font-medium text-gray-500 py-2">
-                          {day}
-                        </div>
-                      ))}
-                      {getDaysInMonth().map((day, i) => {
-                        const isPast = isBefore(day, startOfDay(new Date()));
-                        const isSelected = selectedDate && isSameDay(day, selectedDate);
-                        const isCurrentDay = isToday(day);
-
-                        return (
-                          <button
-                            key={i}
-                            onClick={() => !isPast && handleDateSelect(day)}
-                            disabled={isPast}
-                            className={`aspect-square rounded-lg text-sm font-medium transition-all ${
-                              isPast
-                                ? 'text-gray-300 cursor-not-allowed'
-                                : isSelected
-                                ? 'bg-blue-600 text-white shadow-lg scale-105'
-                                : isCurrentDay
-                                ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
-                                : 'hover:bg-gray-100 text-gray-700'
-                            }`}
-                          >
-                            {format(day, 'd')}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Créneaux horaires */}
-                  {selectedDate && (
+                    {/* Créneaux horaires */}
                     <div>
                       <h3 className="font-semibold mb-3">Créneaux disponibles</h3>
                       {loading ? (
@@ -441,20 +441,31 @@ export default function ModernBookingPage() {
                       ) : availableSlots.length === 0 ? (
                         <p className="text-center text-gray-500 py-8">Aucun créneau disponible ce jour</p>
                       ) : (
-                        <div className="grid grid-cols-3 gap-2 mb-6">
-                          {availableSlots.map((slot, i) => (
-                            <button
-                              key={i}
-                              onClick={() => handleSlotSelect(slot)}
-                              className={`py-3 px-4 rounded-lg text-sm font-medium transition-all ${
-                                selectedSlot === slot
-                                  ? 'bg-blue-600 text-white shadow-md'
-                                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                              }`}
-                            >
-                              {format(new Date(slot.start_datetime), 'HH:mm')}
-                            </button>
-                          ))}
+                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 mb-6">
+                          {availableSlots.map((slot, i) => {
+                            const isBooked = slot.available === false;
+
+                            return (
+                              <button
+                                key={i}
+                                onClick={() => {
+                                  if (!isBooked) {
+                                    handleSlotSelect(slot);
+                                  }
+                                }}
+                                disabled={isBooked}
+                                className={`py-3 px-4 rounded-lg text-sm font-medium transition-all ${
+                                  isBooked
+                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed line-through'
+                                    : selectedSlot === slot
+                                    ? 'bg-blue-600 text-white shadow-md'
+                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                }`}
+                              >
+                                {format(new Date(slot.start_datetime), 'HH:mm')}
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
 
@@ -468,7 +479,7 @@ export default function ModernBookingPage() {
                         </Button>
                       )}
                     </div>
-                  )}
+                  </div>
                 </div>
               )}
 

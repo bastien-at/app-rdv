@@ -8,6 +8,7 @@ import Card from '../../components/Card';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import Badge from '../../components/Badge';
+import { getAdminToken } from '../../services/api';
 
 interface Store {
   id: string;
@@ -44,7 +45,7 @@ export default function AvailabilityManagementPage() {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem('admin_token');
+    const token = getAdminToken();
     if (!token) {
       navigate('/admin/login');
     } else {
@@ -60,9 +61,10 @@ export default function AvailabilityManagementPage() {
 
   const loadStores = async () => {
     try {
+      const token = getAdminToken();
       const response = await fetch('/api/stores', {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
 
@@ -92,7 +94,7 @@ export default function AvailabilityManagementPage() {
 
       const response = await fetch(`/api/admin/stores/${selectedStore}/availability-blocks`, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+          Authorization: `Bearer ${getAdminToken()}`,
         },
       });
 
@@ -124,10 +126,11 @@ export default function AvailabilityManagementPage() {
         block_type: formData.block_type,
       };
 
+      const token = getAdminToken();
       const response = await fetch('/api/admin/availability-blocks', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(newBlock),
@@ -150,10 +153,11 @@ export default function AvailabilityManagementPage() {
     if (!confirm('Êtes-vous sûr de vouloir supprimer ce blocage ?')) return;
 
     try {
+      const token = getAdminToken();
       const response = await fetch(`/api/admin/availability-blocks/${blockId}`, {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('admin_token')}`,
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
 

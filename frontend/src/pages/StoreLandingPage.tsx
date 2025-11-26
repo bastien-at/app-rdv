@@ -114,7 +114,7 @@ export default function StoreLandingPage() {
         {/* Logo Alltricks en haut */}
         <div className="absolute top-8 left-8 z-20">
           <img 
-            src="/assets/alltricks-logo.svg" 
+            src="/assets/logo_alltricks.png" 
             alt="Alltricks" 
             className="h-16 w-auto opacity-90 hover:opacity-100 transition-opacity"
           />
@@ -226,7 +226,7 @@ export default function StoreLandingPage() {
                 >
                   <div className={`absolute inset-0 bg-gradient-to-br ${service.gradient} opacity-0 group-hover:opacity-5 rounded-3xl transition-opacity`}></div>
                   
-                  <div className="relative">
+                  <div className="relative flex flex-col h-full">
                     <div className={`w-16 h-16 bg-gradient-to-br ${service.gradient} rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg`}>
                       <Icon className="w-8 h-8 text-white" />
                     </div>
@@ -240,17 +240,7 @@ export default function StoreLandingPage() {
                       {service.description}
                     </p>
                     
-                    {/* Infos */}
-                    <div className="flex items-center gap-6 mb-6 pb-6 border-b border-gray-200">
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <Clock className="h-5 w-5 text-gray-400" />
-                        <span className="text-sm font-medium">{service.duration}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <span className="text-sm font-medium">{service.priceRange}</span>
-                      </div>
-                    </div>
-
+                  
                     {/* Features */}
                     <ul className="space-y-3 mb-8">
                       {service.features.map((feature, index) => (
@@ -262,14 +252,16 @@ export default function StoreLandingPage() {
                     </ul>
                     
                     {/* Bouton */}
-                    <Button
-                      fullWidth
-                      onClick={() => navigate(`/stores/${storeSlug}/booking?type=${service.id}`)}
-                      className={`bg-gradient-to-r ${service.gradient} hover:shadow-xl group-hover:scale-105 transition-all text-lg py-4`}
-                    >
-                      Réserver maintenant
-                      <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                    </Button>
+                    <div className="mt-auto">
+                      <Button
+                        fullWidth
+                        onClick={() => navigate(`/stores/${storeSlug}/booking?type=${service.id}`)}
+                        className={`bg-gradient-to-r ${service.gradient} hover:shadow-xl group-hover:scale-105 transition-all text-lg py-4`}
+                      >
+                        Réserver maintenant
+                        <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
+                      </Button>
+                    </div>
                   </div>
                 </div>
               );

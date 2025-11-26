@@ -65,7 +65,7 @@ export default function AdminLoginPage() {
         <Card>
           <div className="text-center mb-6">
             <img
-              src="/assets/alltricks-logo.svg"
+              src="/assets/logo_alltricks.png"
               alt="Alltricks"
               className="h-10 w-auto mx-auto mb-3"
             />

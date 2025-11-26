@@ -75,6 +75,49 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 };
 
 /**
+ * Enregistre un rapport d'état des lieux (réception) pour une réservation
+ * Les données sont stockées dans bookings.customer_data.reception_report
+ */
+export const saveReceptionReport = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const report = req.body || {};
+
+    // Fusionner le rapport dans le champ JSONB customer_data.reception_report
+    const result = await query<Booking>(
+      `UPDATE bookings
+       SET customer_data = COALESCE(customer_data, '{}'::jsonb) || jsonb_build_object('reception_report', $2::jsonb)
+       WHERE id = $1
+       RETURNING *`,
+      [id, JSON.stringify(report)],
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: 'Réservation non trouvée',
+      });
+      return;
+    }
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+      message: "Rapport d'état des lieux enregistré",
+    });
+  } catch (error) {
+    console.error("Erreur lors de l'enregistrement du rapport de réception:", error);
+    res.status(500).json({
+      success: false,
+      error: "Erreur lors de l'enregistrement du rapport d'état des lieux",
+    });
+  }
+};
+
+/**
  * Met à jour une réservation côté admin (date, service, technicien) et la confirme
  */
 export const adminUpdateAndConfirmBooking = async (
@@ -272,6 +315,7 @@ export const getStoreBookings = async (
       SELECT 
         b.*,
         srv.name as service_name,
+        srv.service_type as service_type,
         srv.price as service_price,
         t.name as technician_name
       FROM bookings b
