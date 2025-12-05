@@ -1,0 +1,51 @@
+name: Documentation Node/React Auto-Update
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout du Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Installation des dépendances
+        run: npm install
+
+      # --- Étape 1 : Génération de la documentation Node.js (JSDoc) ---
+      - name: Génération de JSDoc pour le Backend
+        # Cette commande suppose que vous avez configuré un script 'docs:jsdoc'
+        # dans votre package.json pour exécuter JSDoc et placer le résultat dans 'docs/api/backend'
+        run: npm run docs:jsdoc
+
+      # --- Étape 2 : Génération de la documentation React (Storybook) ---
+      - name: Construction de Storybook
+        # Cette commande construit votre Storybook en tant que fichiers statiques
+        # et place le résultat dans 'storybook-static' (ou similaire)
+        run: npm run build-storybook
+
+      # --- Étape 3 : Construction du Portail Global (MkDocs) ---
+      - name: Installation de MkDocs
+        run: pip install mkdocs mkdocs-material
+
+      - name: Construction du site MkDocs
+        # Assurez-vous que votre fichier mkdocs.yml inclut des liens
+        # vers les dossiers 'docs/api/backend' (JSDoc) et 'storybook-static'
+        run: mkdocs build
+
+      # --- Étape 4 : Déploiement ---
+      - name: Déploiement vers GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site # Dossier de sortie de MkDocs
+          publish_branch: gh-pages
