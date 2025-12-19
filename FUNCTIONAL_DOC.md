@@ -76,23 +76,44 @@ Vue synthétique de l'activité du magasin :
 
 Pour chaque réservation, l'administrateur peut :
 
-- **Voir les détails** : Informations client et réponses au questionnaire technique.
+- **Voir les détails** : Informations client, coordonnées et réponses au questionnaire technique.
 - **Changer le statut** :
   - _Valider_ : Déclenche l'email de confirmation.
   - _Refuser_ : Déclenche un email d'annulation avec motif.
   - _Terminer_ : Marque la prestation comme réalisée.
   - _No-Show_ : Client ne s'est pas présenté.
 - **Modifier** : Changer l'heure, la date ou le technicien assigné.
+- **Envoyer un rapport d'état des lieux** (réception) :
+  - Saisie d'un compte rendu d'intervention (travaux effectués, pièces, recommandations, coûts).
+  - Envoi d'un email dédié au client avec le récapitulatif détaillé.
 
-### ⚙️ 2.4 Configuration du Magasin
+### ⚙️ 2.4 Configuration du Magasin & des Prestations
 
-- **Services** : Création, modification et suppression des prestations (Nom, Prix, Durée).
-- **Techniciens** : Gestion de l'équipe (Création de comptes, assignation de compétences).
+- **Services globaux** : Catalogue centralisé de prestations (nom, prix, durée, type `workshop` / `fitting`).
+- **Services par magasin** : Activation/désactivation des prestations par magasin à partir du catalogue global.
+- **Techniciens** : Gestion de l'équipe (création, désactivation, assignation de compétences).
 - **Paramètres** :
-  - Gestion des informations générales (Adresse, contact).
+  - Gestion des informations générales (adresse, contact).
   - **Activation des services** : Choix des prestations proposées (Atelier et/ou Étude posturale).
   - **Capacité Atelier** : Configuration du nombre de créneaux simultanés (nombre de techniciens).
   - **Horaires** : Gestion des heures d'ouverture et fermeture.
+
+### 📇 2.5 Annuaire Clients
+
+- Recherche par nom, prénom, email ou téléphone.
+- Accès à l'historique des rendez-vous d'un client.
+- Consultation rapide des coordonnées et informations pertinentes.
+
+### 👤 2.6 Gestion des Administrateurs & Rôles
+
+- Rôles supportés :
+  - `super_admin` : accès global à l'ensemble des magasins, gestion des administrateurs et des paramètres globaux.
+  - `store_admin` : accès limité à un magasin (planning, prestations locales, clients associés).
+- Création et mise à jour des comptes administrateurs (email, nom, rôle, magasin associé).
+- Activation/désactivation d'un compte admin.
+- **Réinitialisation de mot de passe** :
+  - Fonctionnalité "mot de passe oublié" pour les admins.
+  - Envoi d'un email sécurisé contenant un lien de réinitialisation.
 
 ---
 

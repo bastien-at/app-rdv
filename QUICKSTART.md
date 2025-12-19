@@ -17,18 +17,18 @@ cd ../frontend
 npm install
 ```
 
-### 2. Configurer Supabase
+### 2. Configurer PostgreSQL
 
 ```bash
-# 1. Créer un compte sur https://supabase.com
-# 2. Créer un nouveau projet
-# 3. Récupérer la DATABASE_URL dans Settings > Database > Connection string (URI)
+# Créer une base de données locale (exemple avec PostgreSQL installé en local)
+createdb bike_fitting_db
 
 # Copier le fichier d'environnement
 cp .env.example .env
 
-# Éditer .env avec vos configurations Supabase
-# DATABASE_URL=postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-REF].supabase.co:5432/postgres
+# Éditer .env avec vos paramètres PostgreSQL
+# Exemple :
+# DATABASE_URL=postgresql://postgres:motdepasse@localhost:5432/bike_fitting_db
 ```
 
 ### 3. Migrer et peupler la base de données
@@ -43,7 +43,7 @@ npm run migrate
 npm run seed
 ```
 
-**Note** : Vous pouvez aussi exécuter le SQL directement dans l'éditeur SQL de Supabase (copier le contenu de `backend/src/db/schema.sql`)
+**Note** : Vous pouvez aussi exécuter le SQL directement dans un outil type `psql` ou un client graphique en important le contenu de `backend/src/db/schema.sql`.
 
 ### 4. Lancer l'application
 
@@ -135,7 +135,7 @@ Voir `backend/BREVO_SETUP.md` pour les détails.
 ## 🏗️ Structure du projet
 
 ```
-bike-fitting-booking/
+app-rdv/
 ├── backend/              # API Express + TypeScript
 │   ├── src/
 │   │   ├── controllers/  # Logique des routes
@@ -215,18 +215,19 @@ npm install
 - [x] Calendrier avec créneaux disponibles
 - [x] Formulaire de réservation complet
 - [x] Email de confirmation avec iCal
-- [x] Dashboard admin basique
-- [x] Authentification JWT
+- [x] Dashboard admin (planning, listes de RDV)
+- [x] Authentification JWT pour l'admin
 - [x] Validation des données
 - [x] Gestion des conflits de réservation
 
-### 🚧 Phase 2 (À venir)
+### ✅ Phase 2 (en grande partie livrée)
 
 - [x] Rappels automatiques J-2 et J-1
-- [ ] Reporting avancé
-- [ ] Gestion des blocages de disponibilité
-- [ ] Interface admin complète
-- [ ] Export CSV
+- [x] Gestion des blocages de disponibilité (availability_blocks)
+- [x] Interface admin complète (services globaux/magasins, paramètres magasin)
+- [x] Annuaire clients
+- [x] Réinitialisation de mot de passe admin
+- [ ] Reporting avancé et export CSV
 
 ### 💡 Phase 3 (Futur)
 

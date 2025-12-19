@@ -7,7 +7,7 @@ Application web complète de réservation de créneaux d'étude posturale (bike 
 ### Côté Client
 
 - ✅ Sélection de magasin avec filtrage géographique
-- ✅ Choix du service (Route, VTT, Triathlon)
+- ✅ Choix du service (étude posturale / atelier)
 - ✅ Calendrier interactif avec créneaux disponibles en temps réel
 - ✅ Formulaire de réservation avec informations client
 - ✅ Confirmation par email avec pièce jointe iCal
@@ -19,15 +19,18 @@ Application web complète de réservation de créneaux d'étude posturale (bike 
 - ✅ Dashboard avec vue agenda
 - ✅ Gestion du planning et des créneaux
 - ✅ Gestion des réservations (validation, annulation, reprogrammation)
-- ✅ Configuration des services et horaires
-- ✅ Configuration avancée du magasin (Services actifs, Capacité atelier)
+- ✅ Configuration des services globaux et par magasin
+- ✅ Configuration avancée du magasin (services actifs, capacité atelier)
+- ✅ Gestion des administrateurs (rôles `super_admin` / `store_admin`)
+- ✅ Annuaire clients (historique et recherche)
+- ✅ Réinitialisation de mot de passe admin (forgot/reset password)
 - ✅ Reporting et statistiques
 
 ## 🛠️ Stack Technique
 
 - **Frontend**: React 18 + TypeScript + Vite + Tailwind CSS
 - **Backend**: Node.js + Express + TypeScript
-- **Base de données**: PostgreSQL (Supabase)
+- **Base de données**: PostgreSQL
 - **Auth**: JWT
 - **Email**: Brevo API (via fetch)
 - **Calendar**: react-big-calendar + date-fns
@@ -36,7 +39,7 @@ Application web complète de réservation de créneaux d'étude posturale (bike 
 ## 📋 Prérequis
 
 - Node.js 18+
-- Compte Supabase (gratuit) : https://supabase.com
+- PostgreSQL 14+ (local ou hébergé)
 - npm ou yarn
 
 ## 🚀 Installation
@@ -44,8 +47,8 @@ Application web complète de réservation de créneaux d'étude posturale (bike 
 ### 1. Cloner le projet
 
 ```bash
-git clone <repo-url>
-cd bike-fitting-booking
+git clone https://github.com/bastien-at/app-rdv.git
+cd app-rdv
 ```
 
 ### 2. Installer les dépendances
@@ -125,7 +128,7 @@ npm run start
 ## 📁 Structure du projet
 
 ```
-bike-fitting-booking/
+app-rdv/
 ├── frontend/                # Application React
 │   ├── src/
 │   │   ├── components/     # Composants réutilisables
@@ -135,16 +138,17 @@ bike-fitting-booking/
 │   │   ├── types/          # Types TypeScript
 │   │   └── utils/          # Utilitaires
 │   └── package.json
-├── backend/                 # API Express
+├── backend/                 # API Express + logique métier
 │   ├── src/
 │   │   ├── routes/         # Routes API
 │   │   ├── controllers/    # Contrôleurs
-│   │   ├── models/         # Modèles de données
-│   │   ├── services/       # Logique métier
 │   │   ├── middleware/     # Middlewares
-│   │   ├── utils/          # Utilitaires
-│   │   └── db/             # Configuration DB
+│   │   ├── utils/          # Utilitaires (email, auth, logger, etc.)
+│   │   └── db/             # Migrations, seed et accès PostgreSQL
 │   └── package.json
+├── QUICKSTART.md            # Guide d'installation rapide
+├── FUNCTIONAL_DOC.md        # Documentation fonctionnelle détaillée
+├── DEPLOYMENT.md            # Notes de déploiement (Nixpacks, prod)
 └── package.json             # Root package.json
 ```
 
@@ -188,7 +192,11 @@ Tables principales :
 
 ## 📧 Configuration Email (Brevo)
 
-Le système utilise Brevo (anciennement Sendinblue) pour l'envoi d'emails transactionnels.
+Le système utilise Brevo (anciennement Sendinblue) pour l'envoi d'emails transactionnels :
+
+- emails de confirmation de réservation
+- rappels automatiques
+- envoi du rapport d'état des lieux
 
 1.  Créer un compte sur [Brevo](https://www.brevo.com/)
 2.  Générer une clé API v3
@@ -215,19 +223,15 @@ npm test
 
 ## 📦 Déploiement
 
-### Vercel (Frontend) + Railway (Backend + DB)
+Le projet est pensé pour être déployé sur un PaaS (Railway, Render, Fly.io, etc.) avec une base PostgreSQL managée.
 
-1. **Backend sur Railway** :
+- Le frontend est une application Vite/React (dossier `frontend/`).
+- Le backend est une API Node/Express (dossier `backend/`).
 
-   - Créer un nouveau projet
-   - Ajouter PostgreSQL
-   - Déployer depuis GitHub
-   - Configurer les variables d'environnement
+Pour des instructions détaillées (Nixpacks, variables d'environnement, exemples de config), voir :
 
-2. **Frontend sur Vercel** :
-   - Importer le projet depuis GitHub
-   - Configurer le root directory : `frontend`
-   - Ajouter la variable `VITE_API_URL`
+- `DEPLOYMENT.md`
+- `QUICKSTART.md`
 
 ## 🔐 Sécurité
 
