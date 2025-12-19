@@ -12,7 +12,12 @@ import {
   AdminWithStore,
   CreateAdminData,
   UpdateAdminData,
-  CreateStoreData 
+  CreateStoreData,
+  CustomerDirectory,
+  CreateCustomerData,
+  UpdateCustomerData,
+  CustomerSearchResult,
+  PaginatedResponse
 } from '../types';
 
 const API_BASE_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000/api';
@@ -48,6 +53,16 @@ export const getStoreBySlug = async (slug: string): Promise<Store> => {
 export const createStore = async (storeData: CreateStoreData): Promise<Store> => {
   const token = getAdminToken();
   const { data } = await api.post<ApiResponse<Store>>('/admin/stores', storeData, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  return data.data!;
+};
+
+export const updateStore = async (id: string, storeData: Partial<CreateStoreData>): Promise<Store> => {
+  const token = getAdminToken();
+  const { data } = await api.put<ApiResponse<Store>>(`/admin/stores/${id}`, storeData, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -112,6 +127,7 @@ export interface AdminConfirmBookingPayload {
   start_datetime?: string;
   technician_id?: string;
   internal_notes?: string;
+  duration?: number;
 }
 
 export const adminConfirmBooking = async (
@@ -240,7 +256,7 @@ export const createOrUpdateReceptionReportApi = async (
 
 export const sendReceptionReportApi = async (reportId: string): Promise<void> => {
   const token = getAdminToken();
-  await api.post(`/reception-reports/${reportId}/send`, null, {
+  await api.post(`/reception-reports/${reportId}/send`, { sent: true }, {
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -345,6 +361,123 @@ export const deleteAdminApi = async (id: string): Promise<void> => {
       Authorization: `Bearer ${token}`,
     },
   });
+};
+
+// Customer Directory API
+export const getCustomers = async (
+  storeId: string,
+  params?: {
+    page?: number;
+    limit?: number;
+    search?: string;
+  }
+): Promise<PaginatedResponse<CustomerDirectory>> => {
+  const token = getAdminToken();
+  const response = await api.get<any>(
+    `/stores/${storeId}/customers`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      params
+    }
+  );
+  
+  // Le backend renvoie une structure plate { success, data, total, page, ... }
+  // Nous devons retourner un objet PaginatedResponse { data, total, page, ... }
+  return {
+    data: response.data.data || [],
+    total: response.data.total || 0,
+    page: response.data.page || 1,
+    limit: response.data.limit || 20,
+    total_pages: response.data.total_pages || 0
+  };
+};
+
+export const searchCustomers = async (
+  storeId: string,
+  query: string
+): Promise<CustomerSearchResult[]> => {
+  const token = getAdminToken();
+  const { data } = await api.get<ApiResponse<CustomerSearchResult[]>>(
+    `/stores/${storeId}/customers/search`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      params: { q: query }
+    }
+  );
+  return data.data || [];
+};
+
+export const createCustomer = async (
+  storeId: string,
+  customerData: CreateCustomerData
+): Promise<CustomerDirectory> => {
+  const token = getAdminToken();
+  const { data } = await api.post<ApiResponse<CustomerDirectory>>(
+    `/stores/${storeId}/customers`,
+    customerData,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return data.data!;
+};
+
+export const updateCustomer = async (
+  id: string,
+  customerData: UpdateCustomerData
+): Promise<CustomerDirectory> => {
+  const token = getAdminToken();
+  const { data } = await api.put<ApiResponse<CustomerDirectory>>(
+    `/customers/${id}`,
+    customerData,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return data.data!;
+};
+
+export const deleteCustomer = async (id: string): Promise<CustomerDirectory> => {
+  const token = getAdminToken();
+  const { data } = await api.delete<ApiResponse<CustomerDirectory>>(
+    `/customers/${id}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return data.data!;
+};
+
+// Password Management
+export const forgotPassword = async (email: string): Promise<void> => {
+  await api.post('/admin/forgot-password', { email });
+};
+
+export const resetPassword = async (token: string, password: string): Promise<void> => {
+  await api.post(`/admin/reset-password/${token}`, { password });
+};
+
+export const changePassword = async (currentPassword: string, newPassword: string): Promise<void> => {
+  const token = getAdminToken();
+  await api.put(
+    '/admin/change-password',
+    { currentPassword, newPassword },
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
 };
 
 export default api;

@@ -3,7 +3,8 @@ import { query, transaction } from '../db';
 import { Booking, BookingWithDetails, Service, Store } from '../types';
 import { generateBookingToken } from '../utils/auth';
 import { isSlotAvailable, createBookingLock, removeBookingLock } from '../utils/availability';
-import { sendConfirmationEmail, sendCancellationEmail } from '../utils/email';
+import { sendConfirmationEmail, sendCancellationEmail, sendBookingRequestEmail } from '../utils/email';
+import { upsertCustomerFromBooking } from './customerDirectoryController';
 import { addMinutes } from 'date-fns';
 
 /**
@@ -85,6 +86,8 @@ export const createBooking = async (
       customer_data,
     } = req.body;
     
+    console.log('📝 [createBooking] Reçu pour:', customer_email);
+
     const startDate = new Date(start_datetime);
     
     // Récupérer les informations du service pour calculer la durée
@@ -146,6 +149,34 @@ export const createBooking = async (
       );
       
       return result.rows[0];
+    });
+
+    // Ajouter ou mettre à jour le client dans l'annuaire (en arrière-plan)
+    console.log('Tentative d\'ajout du client à l\'annuaire:', {
+      store_id,
+      email: customer_email
+    });
+    
+    upsertCustomerFromBooking(
+      booking.id,
+      store_id,
+      customer_firstname,
+      customer_lastname,
+      customer_email,
+      customer_phone
+    ).then((customer) => {
+      console.log('Client ajouté/mis à jour avec succès dans l\'annuaire:', customer.id);
+    }).catch((error) => {
+      console.error('Erreur CRITIQUE lors de l\'ajout du client à l\'annuaire:', error);
+      // Ne pas bloquer la création de la réservation si l'annuaire échoue
+    });
+
+    // Envoyer l'email de confirmation de réception de demande
+    console.log('✉️ [createBooking] Préparation envoi email demande reçue...');
+    getBookingDetails(booking.id).then((details) => {
+      sendBookingRequestEmail(details).catch(err => 
+        console.error('Erreur lors de l\'envoi de l\'email de demande:', err)
+      );
     });
     
     res.status(201).json({

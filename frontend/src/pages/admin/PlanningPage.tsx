@@ -1,22 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Settings, Plus, Bike, Wrench } from 'lucide-react';
-import { 
-  format, 
-  startOfWeek, 
-  endOfWeek, 
-  startOfMonth, 
-  endOfMonth, 
-  eachDayOfInterval, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Calendar as CalendarIcon,
+  Clock,
+  Settings,
+  Plus,
+  Bike,
+  Wrench,
+} from 'lucide-react';
+import {
+  format,
+  startOfWeek,
+  endOfWeek,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
   addDays,
-  addWeeks, 
-  subWeeks, 
-  addMonths, 
+  addWeeks,
+  subWeeks,
+  addMonths,
   subMonths,
   isSameDay,
   parseISO,
   setHours,
-  setMinutes
+  setMinutes,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import AdminLayout from '../../components/admin/AdminLayout';
@@ -52,6 +61,17 @@ interface Booking {
   booking_token?: string;
 }
 
+interface AvailabilityBlock {
+  id: string;
+  store_id: string;
+  technician_id?: string;
+  start_datetime: string;
+  end_datetime: string;
+  reason: string;
+  block_type: 'closure' | 'maintenance' | 'holiday' | 'other';
+  service_type?: 'fitting' | 'workshop' | null;
+}
+
 interface OpeningHours {
   day: number; // 0-6 (dimanche-samedi)
   is_open: boolean;
@@ -70,19 +90,30 @@ export default function PlanningPage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStore, setSelectedStore] = useState<string>('');
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [availabilityBlocks, setAvailabilityBlocks] = useState<
+    AvailabilityBlock[]
+  >([]);
   const [openingHours, setOpeningHours] = useState<OpeningHours[]>([]);
   const [loading, setLoading] = useState(false);
   const [showHoursModal, setShowHoursModal] = useState(false);
-  const [activeTab, setActiveTab] = useState<'all' | 'fitting' | 'workshop'>('all');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'fitting' | 'workshop'>(
+    'all',
+  );
+  const [statusFilter, setStatusFilter] = useState<
+    'all' | 'pending' | 'confirmed' | 'cancelled'
+  >('all');
   const [showPendingModal, setShowPendingModal] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [showBookingDrawer, setShowBookingDrawer] = useState(false);
-  const [selectedBookingForDrawer, setSelectedBookingForDrawer] = useState<Booking | null>(null);
+  const [selectedBookingForDrawer, setSelectedBookingForDrawer] =
+    useState<Booking | null>(null);
 
   const getAdminStoreId = (): string | null => {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem('admin_store_id') || sessionStorage.getItem('admin_store_id');
+    return (
+      localStorage.getItem('admin_store_id') ||
+      sessionStorage.getItem('admin_store_id')
+    );
   };
 
   useEffect(() => {
@@ -100,8 +131,24 @@ export default function PlanningPage() {
     if (selectedStore) {
       loadBookings();
       loadOpeningHours();
+      loadAvailabilityBlocks();
     }
   }, [selectedStore, currentDate, viewMode]);
+
+  // Mettre à jour la réservation sélectionnée quand la liste change (ex: après modification)
+  useEffect(() => {
+    if (selectedBookingForDrawer && bookings.length > 0) {
+      const updated = bookings.find(
+        (b) => b.id === selectedBookingForDrawer.id,
+      );
+      if (
+        updated &&
+        JSON.stringify(updated) !== JSON.stringify(selectedBookingForDrawer)
+      ) {
+        setSelectedBookingForDrawer(updated);
+      }
+    }
+  }, [bookings]);
 
   const loadStores = async () => {
     try {
@@ -151,11 +198,14 @@ export default function PlanningPage() {
 
       // On récupère les réservations du magasin, sans filtre de date, puis on filtre côté frontend
       const token = getAdminToken();
-      const response = await fetch(`/api/admin/stores/${selectedStore}/bookings?limit=500`, {
-        headers: {
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      const response = await fetch(
+        `/api/admin/stores/${selectedStore}/bookings?limit=500`,
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
         },
-      });
+      );
 
       if (!response.ok) {
         throw new Error('Erreur API réservations');
@@ -172,7 +222,9 @@ export default function PlanningPage() {
         customer_firstname: b.customer_firstname,
         customer_lastname: b.customer_lastname,
         service_name: b.service_name,
-        service_type: (b.service_type === 'workshop' ? 'workshop' : 'fitting') as 'fitting' | 'workshop',
+        service_type: (b.service_type === 'workshop'
+          ? 'workshop'
+          : 'fitting') as 'fitting' | 'workshop',
         start_datetime: b.start_datetime,
         end_datetime: b.end_datetime,
         status: b.status,
@@ -219,18 +271,88 @@ export default function PlanningPage() {
 
       // Transformation OpeningHours backend -> tableau OpeningHours frontend
       const mapped: OpeningHours[] = [
-        { day: 1, is_open: !oh.monday?.closed,  morning_start: oh.monday?.open,  morning_end: oh.monday?.close },
-        { day: 2, is_open: !oh.tuesday?.closed, morning_start: oh.tuesday?.open, morning_end: oh.tuesday?.close },
-        { day: 3, is_open: !oh.wednesday?.closed, morning_start: oh.wednesday?.open, morning_end: oh.wednesday?.close },
-        { day: 4, is_open: !oh.thursday?.closed, morning_start: oh.thursday?.open, morning_end: oh.thursday?.close },
-        { day: 5, is_open: !oh.friday?.closed,  morning_start: oh.friday?.open,  morning_end: oh.friday?.close },
-        { day: 6, is_open: !oh.saturday?.closed, morning_start: oh.saturday?.open, morning_end: oh.saturday?.close },
-        { day: 0, is_open: !oh.sunday?.closed,  morning_start: oh.sunday?.open,  morning_end: oh.sunday?.close },
+        {
+          day: 1,
+          is_open: !oh.monday?.closed,
+          morning_start: oh.monday?.open,
+          morning_end: oh.monday?.close,
+        },
+        {
+          day: 2,
+          is_open: !oh.tuesday?.closed,
+          morning_start: oh.tuesday?.open,
+          morning_end: oh.tuesday?.close,
+        },
+        {
+          day: 3,
+          is_open: !oh.wednesday?.closed,
+          morning_start: oh.wednesday?.open,
+          morning_end: oh.wednesday?.close,
+        },
+        {
+          day: 4,
+          is_open: !oh.thursday?.closed,
+          morning_start: oh.thursday?.open,
+          morning_end: oh.thursday?.close,
+        },
+        {
+          day: 5,
+          is_open: !oh.friday?.closed,
+          morning_start: oh.friday?.open,
+          morning_end: oh.friday?.close,
+        },
+        {
+          day: 6,
+          is_open: !oh.saturday?.closed,
+          morning_start: oh.saturday?.open,
+          morning_end: oh.saturday?.close,
+        },
+        {
+          day: 0,
+          is_open: !oh.sunday?.closed,
+          morning_start: oh.sunday?.open,
+          morning_end: oh.sunday?.close,
+        },
       ];
 
       setOpeningHours(mapped);
     } catch (error) {
       console.error('Erreur chargement horaires:', error);
+    }
+  };
+
+  const loadAvailabilityBlocks = async () => {
+    try {
+      if (!selectedStore) {
+        setAvailabilityBlocks([]);
+        return;
+      }
+
+      const token = getAdminToken();
+      const response = await fetch(
+        `/api/admin/stores/${selectedStore}/availability-blocks`,
+        {
+          headers: {
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        },
+      );
+
+      if (!response.ok) {
+        console.error(
+          'Erreur chargement blocages:',
+          response.status,
+          response.statusText,
+        );
+        throw new Error('Erreur API blocages');
+      }
+
+      const json = await response.json();
+      if (json.success) {
+        setAvailabilityBlocks(json.data);
+      }
+    } catch (error) {
+      console.error('Erreur chargement blocages:', error);
     }
   };
 
@@ -243,39 +365,75 @@ export default function PlanningPage() {
       // Lundi (1) à samedi (6) uniquement, on exclut le dimanche (0)
       return Array.from({ length: 7 }, (_, i) =>
         addDays(startOfWeek(currentDate, { weekStartsOn: 1 }), i),
-      ).filter(day => day.getDay() !== 0);
+      ).filter((day) => day.getDay() !== 0);
     }
 
     // Vue mois : on génère tous les jours puis on supprime les dimanches
     return eachDayOfInterval({
       start: startOfMonth(currentDate),
       end: endOfMonth(currentDate),
-    }).filter(day => day.getDay() !== 0);
+    }).filter((day) => day.getDay() !== 0);
   };
 
   const getBookingsForDay = (day: Date) => {
-    return bookings.filter(booking => {
+    return bookings.filter((booking) => {
       const matchesDay = isSameDay(parseISO(booking.start_datetime), day);
-      const matchesTab = activeTab === 'all' || booking.service_type === activeTab;
-      const matchesStatus = statusFilter === 'all' || booking.status === statusFilter;
+      const matchesTab =
+        activeTab === 'all' || booking.service_type === activeTab;
+
+      let matchesStatus = false;
+      if (statusFilter === 'all') {
+        // Par défaut, on ne montre pas les annulées pour libérer le créneau visuellement
+        matchesStatus = booking.status !== 'cancelled';
+      } else {
+        matchesStatus = booking.status === statusFilter;
+      }
+
       return matchesDay && matchesTab && matchesStatus;
     });
   };
-  
+
   const stats = {
     total: bookings.length,
-    fitting: bookings.filter(b => b.service_type === 'fitting').length,
-    workshop: bookings.filter(b => b.service_type === 'workshop').length,
-    pending: bookings.filter(b => b.status === 'pending').length,
-    confirmed: bookings.filter(b => b.status === 'confirmed').length,
-    cancelled: bookings.filter(b => b.status === 'cancelled').length,
+    fitting: bookings.filter((b) => b.service_type === 'fitting').length,
+    workshop: bookings.filter((b) => b.service_type === 'workshop').length,
+    pending: bookings.filter((b) => b.status === 'pending').length,
+    confirmed: bookings.filter((b) => b.status === 'confirmed').length,
+    cancelled: bookings.filter((b) => b.status === 'cancelled').length,
   };
 
-  const pendingBookings = bookings.filter(b => b.status === 'pending');
+  const pendingBookings = bookings.filter((b) => b.status === 'pending');
 
   const getOpeningHoursForDay = (day: Date) => {
     const dayOfWeek = day.getDay();
-    return openingHours.find(h => h.day === dayOfWeek);
+    return openingHours.find((h) => h.day === dayOfWeek);
+  };
+
+  const getAvailabilityBlockForDateTime = (date: Date, hour: number) => {
+    const slotStart = new Date(date);
+    slotStart.setHours(hour, 0, 0, 0);
+    const slotEnd = new Date(date);
+    slotEnd.setHours(hour + 1, 0, 0, 0);
+
+    return availabilityBlocks.find((block) => {
+      const blockStart = new Date(block.start_datetime);
+      const blockEnd = new Date(block.end_datetime);
+
+      // Vérifier si le blocage chevauche le créneau
+      const isOverlapping = blockStart < slotEnd && blockEnd > slotStart;
+      if (!isOverlapping) return false;
+
+      // Vérifier si le type de blocage correspond au filtre actif
+      if (activeTab === 'all') {
+        return true;
+      } else if (activeTab === 'fitting') {
+        return !block.service_type || block.service_type === 'fitting';
+      } else if (activeTab === 'workshop') {
+        return !block.service_type || block.service_type === 'workshop';
+      }
+
+      return false;
+    });
   };
 
   const isDayFullyBooked = (day: Date): boolean => {
@@ -291,7 +449,8 @@ export default function PlanningPage() {
         const bookingDate = new Date(b.start_datetime);
         return bookingDate.getHours() === hour;
       });
-      return hasBookingAtHour;
+      const isBlocked = !!getAvailabilityBlockForDateTime(day, hour);
+      return hasBookingAtHour || isBlocked;
     });
   };
 
@@ -312,22 +471,22 @@ export default function PlanningPage() {
   const handleCreateBookingForDay = (day: Date) => {
     if (!selectedStore) return;
 
-    const median = new Date(day);
-    median.setHours(15, 0, 0, 0);
+    // On prépare les paramètres de date (même si ignorés pour l'instant par le form, c'est prêt pour le futur)
+    const dateParam = format(day, 'yyyy-MM-dd');
 
-    const dateParam = format(median, 'yyyy-MM-dd');
-    const timeParam = format(median, 'HH:mm');
+    let url = `/stores/${selectedStore}/booking?source=admin&date=${dateParam}`;
 
-    // Type de service selon l'onglet actif
-    let typeParam = '';
+    // Conditionnement selon l'onglet actif
     if (activeTab === 'fitting') {
-      typeParam = '&type=fitting';
+      // Vers le formulaire étude posturale
+      url += '&type=fitting';
     } else if (activeTab === 'workshop') {
-      typeParam = '&type=workshop';
+      // Vers le formulaire atelier
+      url += '&type=workshop';
     }
+    // Si activeTab === 'all', on ne met pas de type, donc redirection vers l'étape 1 (choix service)
 
-    // Redirection vers le flux client, pré-filtré sur le magasin de l'admin
-    navigate(`/stores/${selectedStore}/booking?date=${dateParam}&time=${timeParam}&source=admin${typeParam}`);
+    navigate(url);
   };
 
   const handleCreateBookingForDateTime = (day: Date, hour: number) => {
@@ -346,7 +505,9 @@ export default function PlanningPage() {
       typeParam = '&type=workshop';
     }
 
-    navigate(`/stores/${selectedStore}/booking?date=${dateParam}&time=${timeParam}&source=admin${typeParam}`);
+    navigate(
+      `/stores/${selectedStore}/booking?date=${dateParam}&time=${timeParam}&source=admin${typeParam}`,
+    );
   };
 
   const navigatePrevious = () => {
@@ -397,17 +558,23 @@ export default function PlanningPage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'confirmed': return 'bg-green-100 border-green-300 text-green-800';
-      case 'pending': return 'bg-yellow-100 border-yellow-300 text-yellow-800';
-      case 'cancelled': return 'bg-red-100 border-red-300 text-red-800';
-      default: return 'bg-gray-100 border-gray-300 text-gray-800';
+      case 'confirmed':
+        return 'bg-green-100 border-green-300 text-green-800';
+      case 'pending':
+        return 'bg-yellow-100 border-yellow-300 text-yellow-800';
+      case 'cancelled':
+        return 'bg-red-100 border-red-300 text-red-800';
+      default:
+        return 'bg-gray-100 border-gray-300 text-gray-800';
     }
   };
-  
+
   const getServiceTypeIcon = (serviceType: 'fitting' | 'workshop') => {
-    return serviceType === 'fitting' 
-      ? <Bike className="h-3 w-3 inline mr-1" />
-      : <Wrench className="h-3 w-3 inline mr-1" />;
+    return serviceType === 'fitting' ? (
+      <Bike className="h-3 w-3 inline mr-1" />
+    ) : (
+      <Wrench className="h-3 w-3 inline mr-1" />
+    );
   };
 
   const days = getDaysToDisplay();
@@ -437,7 +604,7 @@ export default function PlanningPage() {
                       </span>
                     </div>
                   </button>
-                
+
                   <button
                     onClick={() => setActiveTab('fitting')}
                     className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
@@ -454,7 +621,7 @@ export default function PlanningPage() {
                       </span>
                     </div>
                   </button>
-                
+
                   <button
                     onClick={() => setActiveTab('workshop')}
                     className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
@@ -480,7 +647,9 @@ export default function PlanningPage() {
                     <button
                       onClick={() => setStatusFilter('all')}
                       className={`px-3 py-1.5 rounded-lg font-medium transition-colors text-xs ${
-                        statusFilter === 'all' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                        statusFilter === 'all'
+                          ? 'bg-white text-gray-900 shadow-sm'
+                          : 'text-gray-600 hover:text-gray-900'
                       }`}
                     >
                       Tous ({stats.total})
@@ -491,7 +660,9 @@ export default function PlanningPage() {
                         setShowPendingModal(true);
                       }}
                       className={`px-3 py-1.5 rounded-lg font-medium transition-colors text-xs ${
-                        statusFilter === 'pending' ? 'bg-orange-500 text-white shadow-sm' : 'text-orange-700 hover:bg-orange-100'
+                        statusFilter === 'pending'
+                          ? 'bg-orange-500 text-white shadow-sm'
+                          : 'text-orange-700 hover:bg-orange-100'
                       }`}
                     >
                       En attente ({stats.pending})
@@ -499,7 +670,9 @@ export default function PlanningPage() {
                     <button
                       onClick={() => setStatusFilter('confirmed')}
                       className={`px-3 py-1.5 rounded-lg font-medium transition-colors text-xs ${
-                        statusFilter === 'confirmed' ? 'bg-green-600 text-white shadow-sm' : 'text-green-700 hover:bg-green-100'
+                        statusFilter === 'confirmed'
+                          ? 'bg-green-600 text-white shadow-sm'
+                          : 'text-green-700 hover:bg-green-100'
                       }`}
                     >
                       Confirmés ({stats.confirmed})
@@ -507,7 +680,9 @@ export default function PlanningPage() {
                     <button
                       onClick={() => setStatusFilter('cancelled')}
                       className={`px-3 py-1.5 rounded-lg font-medium transition-colors text-xs ${
-                        statusFilter === 'cancelled' ? 'bg-red-600 text-white shadow-sm' : 'text-red-700 hover:bg-red-100'
+                        statusFilter === 'cancelled'
+                          ? 'bg-red-600 text-white shadow-sm'
+                          : 'text-red-700 hover:bg-red-100'
                       }`}
                     >
                       Annulés ({stats.cancelled})
@@ -521,7 +696,6 @@ export default function PlanningPage() {
           {/* Toolbar */}
           <Card className="mb-6">
             <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
-
               {/* Mode vue */}
               <div className="flex items-center gap-2">
                 <Button
@@ -556,7 +730,11 @@ export default function PlanningPage() {
                 <Button variant="ghost" size="sm" onClick={navigateToday}>
                   Aujourd'hui
                 </Button>
-                <Button variant="ghost" size="sm" onClick={goToNextAvailableDay}>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={goToNextAvailableDay}
+                >
                   Prochaine disponibilité
                 </Button>
 
@@ -564,8 +742,16 @@ export default function PlanningPage() {
                   {viewMode === 'day'
                     ? format(currentDate, 'EEEE d MMMM yyyy', { locale: fr })
                     : viewMode === 'week'
-                      ? `Semaine du ${format(startOfWeek(currentDate, { weekStartsOn: 1 }), 'd MMM', { locale: fr })} au ${format(endOfWeek(currentDate, { weekStartsOn: 1 }), 'd MMM yyyy', { locale: fr })}`
-                      : format(currentDate, 'MMMM yyyy', { locale: fr })}
+                    ? `Semaine du ${format(
+                        startOfWeek(currentDate, { weekStartsOn: 1 }),
+                        'd MMM',
+                        { locale: fr },
+                      )} au ${format(
+                        endOfWeek(currentDate, { weekStartsOn: 1 }),
+                        'd MMM yyyy',
+                        { locale: fr },
+                      )}`
+                    : format(currentDate, 'MMMM yyyy', { locale: fr })}
                 </span>
 
                 <Button variant="ghost" size="sm" onClick={navigateNext}>
@@ -600,11 +786,16 @@ export default function PlanningPage() {
                   // Vue mois
                   <div className="grid grid-cols-7 gap-px bg-gray-200">
                     {/* Header jours */}
-                    {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map((day) => (
-                      <div key={day} className="bg-white p-2 text-center font-semibold text-sm text-gray-700">
-                        {day}
-                      </div>
-                    ))}
+                    {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(
+                      (day) => (
+                        <div
+                          key={day}
+                          className="bg-white p-2 text-center font-semibold text-sm text-gray-700"
+                        >
+                          {day}
+                        </div>
+                      ),
+                    )}
 
                     {/* Jours du mois */}
                     {days.map((day) => {
@@ -616,12 +807,16 @@ export default function PlanningPage() {
                       return (
                         <div
                           key={day.toISOString()}
-                          className={`bg-white p-2 min-h-[100px] ${!isOpen ? 'bg-gray-50' : ''}`}
+                          className={`bg-white p-2 min-h-[100px] ${
+                            !isOpen ? 'bg-gray-50' : ''
+                          }`}
                         >
                           <div className="flex items-center justify-between mb-1">
                             <span
                               className={`text-sm ${
-                                isSameDay(day, new Date()) ? 'text-blue-500 font-bold' : 'text-gray-700'
+                                isSameDay(day, new Date())
+                                  ? 'text-blue-500 font-bold'
+                                  : 'text-gray-700'
                               }`}
                             >
                               {format(day, 'd')}
@@ -649,17 +844,23 @@ export default function PlanningPage() {
                                 {dayBookings.slice(0, 3).map((booking) => (
                                   <div
                                     key={booking.id}
-                                    className={`text-xs p-1 rounded border ${getStatusColor(booking.status)} cursor-pointer hover:shadow-sm transition`}
+                                    className={`text-xs p-1 rounded border ${getStatusColor(
+                                      booking.status,
+                                    )} cursor-pointer hover:shadow-sm transition`}
                                     onClick={() => {
                                       setSelectedBookingForDrawer(booking);
                                       setShowBookingDrawer(true);
                                     }}
                                   >
                                     <div className="truncate font-semibold">
-                                      {format(parseISO(booking.start_datetime), 'HH:mm')}
+                                      {format(
+                                        parseISO(booking.start_datetime),
+                                        'HH:mm',
+                                      )}
                                     </div>
                                     <div className="truncate">
-                                      {booking.customer_firstname} {booking.customer_lastname}
+                                      {booking.customer_firstname}{' '}
+                                      {booking.customer_lastname}
                                     </div>
                                   </div>
                                 ))}
@@ -692,7 +893,10 @@ export default function PlanningPage() {
                       const full = isDayFullyBooked(day);
 
                       return (
-                        <div key={day.toISOString()} className="bg-white p-2 text-center">
+                        <div
+                          key={day.toISOString()}
+                          className="bg-white p-2 text-center"
+                        >
                           <div className="font-semibold text-sm text-gray-900">
                             {format(day, 'EEE', { locale: fr })}
                           </div>
@@ -717,55 +921,106 @@ export default function PlanningPage() {
                     })}
 
                     {/* Grille horaire (10h00 à 19h00) */}
-                    {Array.from({ length: 10 }, (_, i) => i + 10).map((hour) => (
-                      <>
-                        <div key={`hour-${hour}`} className="bg-white p-2 text-sm text-gray-600 border-t border-gray-200">
-                          {hour}:00
-                        </div>
-                        {days.map((day) => {
-                          const dayBookings = getBookingsForDay(day).filter(b => {
-                              const bookingHour = new Date(b.start_datetime).getHours();
-                              return bookingHour === hour;
-                            });
-                          const hours = getOpeningHoursForDay(day);
-                          const isOpen = hours?.is_open;
-                          const isEmptySlot = isOpen && dayBookings.length === 0;
+                    {Array.from({ length: 10 }, (_, i) => i + 10).map(
+                      (hour) => (
+                        <Fragment key={hour}>
+                          <div className="bg-white p-2 text-sm text-gray-600 border-t border-gray-200">
+                            {hour}:00
+                          </div>
+                          {days.map((day) => {
+                            const dayBookings = getBookingsForDay(day).filter(
+                              (b) => {
+                                const bookingHour = new Date(
+                                  b.start_datetime,
+                                ).getHours();
+                                return bookingHour === hour;
+                              },
+                            );
+                            const hours = getOpeningHoursForDay(day);
+                            const isOpen = hours?.is_open;
 
-                          return (
-                            <div 
-                              key={`${day.toISOString()}-${hour}`}
-                              className={`bg-white p-1 border-t border-gray-200 min-h-[60px] ${!isOpen ? 'bg-gray-50' : ''} ${isEmptySlot ? 'cursor-pointer hover:bg-blue-50' : ''}`}
-                              onClick={() => {
-                                if (isEmptySlot) {
-                                  handleCreateBookingForDateTime(day, hour);
+                            const blockingBlock =
+                              getAvailabilityBlockForDateTime(day, hour);
+                            const isBlocked = !!blockingBlock;
+
+                            const isEmptySlot =
+                              isOpen && dayBookings.length === 0 && !isBlocked;
+
+                            return (
+                              <div
+                                key={`${day.toISOString()}-${hour}`}
+                                className={`bg-white p-1 border-t border-gray-200 min-h-[60px] 
+                                ${!isOpen ? 'bg-gray-50' : ''} 
+                                ${
+                                  isEmptySlot
+                                    ? 'cursor-pointer hover:bg-blue-50'
+                                    : ''
                                 }
-                              }}
-                            >
-                              {dayBookings.map((booking) => (
-                                <div
-                                  key={booking.id}
-                                  className={`text-xs p-2 rounded mb-1 border ${getStatusColor(booking.status)} cursor-pointer hover:shadow-sm transition`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedBookingForDrawer(booking);
-                                    setShowBookingDrawer(true);
-                                  }}
-                                >
-                                  <div className="font-semibold truncate">
-                                    {getServiceTypeIcon(booking.service_type)}
-                                    {booking.customer_firstname} {booking.customer_lastname}
+                                ${
+                                  isBlocked
+                                    ? 'bg-gray-100 cursor-not-allowed'
+                                    : ''
+                                }
+                              `}
+                                onClick={() => {
+                                  if (isEmptySlot) {
+                                    handleCreateBookingForDateTime(day, hour);
+                                  }
+                                }}
+                              >
+                                {isBlocked && (
+                                  <div className="h-full w-full flex items-center justify-center p-2">
+                                    <span className="text-xs text-gray-500 font-medium bg-white/80 px-2 py-1 rounded border border-gray-200 text-center w-full">
+                                      {blockingBlock.reason}
+                                      <div className="text-[10px] text-gray-400 font-normal mt-0.5">
+                                        {blockingBlock.service_type ===
+                                        'fitting'
+                                          ? 'Étude posturale'
+                                          : blockingBlock.service_type ===
+                                            'workshop'
+                                          ? 'Atelier'
+                                          : 'Tous services'}
+                                      </div>
+                                    </span>
                                   </div>
-                                  <div className="truncate">{booking.service_name}</div>
-                                  {booking.technician_name && (
-                                    <div className="text-xs opacity-75">{booking.technician_name}</div>
-                                  )}
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        })}
-                      </>
-                    ))}
+                                )}
+
+                                {!isBlocked &&
+                                  dayBookings.map((booking) => (
+                                    <div
+                                      key={booking.id}
+                                      className={`text-xs p-2 rounded mb-1 border ${getStatusColor(
+                                        booking.status,
+                                      )} cursor-pointer hover:shadow-sm transition`}
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setSelectedBookingForDrawer(booking);
+                                        setShowBookingDrawer(true);
+                                      }}
+                                    >
+                                      <div className="font-semibold truncate">
+                                        {getServiceTypeIcon(
+                                          booking.service_type,
+                                        )}
+                                        {booking.customer_firstname}{' '}
+                                        {booking.customer_lastname}
+                                      </div>
+                                      <div className="truncate">
+                                        {booking.service_name}
+                                      </div>
+                                      {booking.technician_name && (
+                                        <div className="text-xs opacity-75">
+                                          {booking.technician_name}
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                              </div>
+                            );
+                          })}
+                        </Fragment>
+                      ),
+                    )}
                   </div>
                 )}
               </div>
@@ -808,14 +1063,27 @@ export default function PlanningPage() {
               </div>
 
               <div className="space-y-4">
-                {['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'].map((dayName, index) => {
+                {[
+                  'Lundi',
+                  'Mardi',
+                  'Mercredi',
+                  'Jeudi',
+                  'Vendredi',
+                  'Samedi',
+                  'Dimanche',
+                ].map((dayName, index) => {
                   const dayIndex = index === 6 ? 0 : index + 1;
-                  const hours = openingHours.find(h => h.day === dayIndex);
+                  const hours = openingHours.find((h) => h.day === dayIndex);
 
                   return (
-                    <div key={dayName} className="border border-gray-200 rounded-lg p-4">
+                    <div
+                      key={dayName}
+                      className="border border-gray-200 rounded-lg p-4"
+                    >
                       <div className="flex items-center justify-between mb-3">
-                        <span className="font-semibold text-gray-900">{dayName}</span>
+                        <span className="font-semibold text-gray-900">
+                          {dayName}
+                        </span>
                         <label className="flex items-center gap-2">
                           <input
                             type="checkbox"
@@ -877,12 +1145,14 @@ export default function PlanningPage() {
               </div>
 
               <div className="flex gap-3 mt-6">
-                <Button variant="ghost" onClick={() => setShowHoursModal(false)} fullWidth>
+                <Button
+                  variant="ghost"
+                  onClick={() => setShowHoursModal(false)}
+                  fullWidth
+                >
                   Fermer
                 </Button>
-                <Button fullWidth>
-                  Enregistrer
-                </Button>
+                <Button fullWidth>Enregistrer</Button>
               </div>
             </Card>
           </div>
@@ -893,7 +1163,9 @@ export default function PlanningPage() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
             <Card className="max-w-3xl w-full max-h-[90vh] overflow-y-auto">
               <div className="flex items-center justify-between mb-6">
-                <h3 className="text-xl font-bold">Valider les rendez-vous en attente</h3>
+                <h3 className="text-xl font-bold">
+                  Valider les rendez-vous en attente
+                </h3>
                 <button
                   onClick={() => setShowPendingModal(false)}
                   className="text-gray-400 hover:text-gray-600"
@@ -919,15 +1191,23 @@ export default function PlanningPage() {
                             En attente
                           </span>
                           <span className="text-sm font-semibold text-gray-900">
-                            {format(parseISO(booking.start_datetime), 'EEEE d MMMM yyyy', { locale: fr })}
+                            {format(
+                              parseISO(booking.start_datetime),
+                              'EEEE d MMMM yyyy',
+                              { locale: fr },
+                            )}
                           </span>
                           <span className="text-sm text-gray-600">
-                            à {format(parseISO(booking.start_datetime), 'HH:mm', { locale: fr })}
+                            à{' '}
+                            {format(parseISO(booking.start_datetime), 'HH:mm', {
+                              locale: fr,
+                            })}
                           </span>
                         </div>
                         <div className="text-sm font-medium text-gray-900 truncate">
                           {getServiceTypeIcon(booking.service_type)}
-                          {booking.customer_firstname} {booking.customer_lastname}
+                          {booking.customer_firstname}{' '}
+                          {booking.customer_lastname}
                         </div>
                         <div className="text-xs text-gray-600 truncate">
                           {booking.service_name}
@@ -938,9 +1218,13 @@ export default function PlanningPage() {
                           size="sm"
                           variant="primary"
                           onClick={() => handleQuickConfirm(booking.id)}
-                          disabled={!!confirmingId && confirmingId === booking.id}
+                          disabled={
+                            !!confirmingId && confirmingId === booking.id
+                          }
                         >
-                          {confirmingId === booking.id ? 'Validation...' : 'Valider'}
+                          {confirmingId === booking.id
+                            ? 'Validation...'
+                            : 'Valider'}
                         </Button>
                       </div>
                     </div>

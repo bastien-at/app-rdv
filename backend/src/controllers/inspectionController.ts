@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { query } from '../db';
-// import { sendInspectionEmail, sendReceptionReportEmail } from '../utils/email';
+import { sendReceptionReportEmail } from '../utils/email';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -22,7 +22,7 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
   fileFilter: (req, file, cb) => {
     const allowedTypes = /jpeg|jpg|png|webp/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
@@ -313,7 +313,12 @@ export const sendReceptionReport = async (
   res: Response
 ): Promise<void> => {
   try {
+    console.log('📧 [sendReceptionReport] Starting...');
+    console.log('📧 [sendReceptionReport] Params:', req.params);
+    console.log('📧 [sendReceptionReport] Body:', req.body);
+    
     const { reportId } = req.params;
+    console.log('📧 [sendReceptionReport] Report ID:', reportId);
 
     // Récupérer le PV avec toutes les infos
     const result = await query(
@@ -336,7 +341,10 @@ export const sendReceptionReport = async (
       [reportId]
     );
 
+    console.log('📧 [sendReceptionReport] Query result rows:', result.rows.length);
+
     if (result.rows.length === 0) {
+      console.log('📧 [sendReceptionReport] Report not found');
       res.status(404).json({
         success: false,
         error: 'PV de réception non trouvé',
@@ -345,6 +353,7 @@ export const sendReceptionReport = async (
     }
 
     const report = result.rows[0];
+    console.log('📧 [sendReceptionReport] Report found:', report.id);
 
     // Marquer comme envoyé
     await query(
@@ -354,16 +363,23 @@ export const sendReceptionReport = async (
       [reportId]
     );
 
-    // Envoyer l'email (TODO: implémenter sendReceptionReportEmail)
-    // await sendReceptionReportEmail(report);
-    console.log('✅ PV de réception marqué comme envoyé (email désactivé)');
+    console.log(' [sendReceptionReport] Report marked as sent');
+
+    // Envoyer l'email 
+    await sendReceptionReportEmail(report);
+    console.log(' [sendReceptionReport] PV de réception envoyé par email');
 
     res.json({
       success: true,
       message: 'PV de réception envoyé par email',
     });
   } catch (error) {
-    console.error('Erreur envoi PV:', error);
+    console.error(' [sendReceptionReport] Error:', error);
+    console.error(' [sendReceptionReport] Error stack:', error instanceof Error ? error.stack : 'No stack');
+    console.error(' [sendReceptionReport] Error message:', error instanceof Error ? error.message : String(error));
+    console.error('❌ [sendReceptionReport] Error:', error);
+    console.error('❌ [sendReceptionReport] Error stack:', error instanceof Error ? error.stack : 'No stack');
+    console.error('❌ [sendReceptionReport] Error message:', error instanceof Error ? error.message : String(error));
     res.status(500).json({
       success: false,
       error: 'Erreur lors de l\'envoi du PV de réception',

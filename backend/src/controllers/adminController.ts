@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { query } from '../db';
+import crypto from 'crypto';
 import {
   Admin,
   AdminWithStore,
@@ -12,7 +13,7 @@ import {
 import { hashPassword, verifyPassword, generateToken } from '../utils/auth';
 import { format, startOfMonth, endOfMonth, addMinutes } from 'date-fns';
 import { isSlotAvailable } from '../utils/availability';
-import { sendConfirmationEmail } from '../utils/email';
+import { sendConfirmationEmail, sendPasswordResetEmail } from '../utils/email';
 
 /**
  * Connexion admin
@@ -75,6 +76,176 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 };
 
 /**
+ * Demande de réinitialisation de mot de passe
+ */
+export const forgotPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { email } = req.body;
+
+    const result = await query<Admin>(
+      'SELECT * FROM admins WHERE email = $1 AND active = true',
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      // On ne révèle pas si l'email existe ou non pour sécurité
+      res.json({
+        success: true,
+        message: 'Si cet email existe, vous recevrez un lien de réinitialisation'
+      });
+      return;
+    }
+
+    const admin = result.rows[0];
+    
+    // Générer un token aléatoire
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenHash = crypto
+      .createHash('sha256')
+      .update(resetToken)
+      .digest('hex');
+
+    // Le token expire dans 1 heure
+    const passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
+
+    // Sauvegarder le hash du token et l'expiration
+    await query(
+      'UPDATE admins SET reset_password_token = $1, reset_password_expires = $2 WHERE id = $3',
+      [resetTokenHash, passwordResetExpires, admin.id]
+    );
+
+    // Envoyer l'email avec le token original (non hashé)
+    try {
+      await sendPasswordResetEmail(email, resetToken);
+      
+      res.json({
+        success: true,
+        message: 'Email de réinitialisation envoyé'
+      });
+    } catch (err) {
+      // En cas d'erreur d'envoi, on nettoie le token
+      await query(
+        'UPDATE admins SET reset_password_token = NULL, reset_password_expires = NULL WHERE id = $1',
+        [admin.id]
+      );
+      throw err;
+    }
+  } catch (error) {
+    console.error('Erreur forgotPassword:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la demande de réinitialisation'
+    });
+  }
+};
+
+/**
+ * Réinitialisation du mot de passe
+ */
+export const resetPassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    const resetTokenHash = crypto
+      .createHash('sha256')
+      .update(token)
+      .digest('hex');
+
+    const result = await query<Admin>(
+      'SELECT * FROM admins WHERE reset_password_token = $1 AND reset_password_expires > $2',
+      [resetTokenHash, new Date()]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(400).json({
+        success: false,
+        error: 'Le lien est invalide ou a expiré'
+      });
+      return;
+    }
+
+    const admin = result.rows[0];
+    const passwordHash = await hashPassword(password);
+
+    await query(
+      `UPDATE admins 
+       SET password_hash = $1, 
+           reset_password_token = NULL, 
+           reset_password_expires = NULL 
+       WHERE id = $2`,
+      [passwordHash, admin.id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Mot de passe réinitialisé avec succès'
+    });
+  } catch (error) {
+    console.error('Erreur resetPassword:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la réinitialisation du mot de passe'
+    });
+  }
+};
+
+/**
+ * Changement de mot de passe (connecté)
+ */
+export const changePassword = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const adminId = (req as any).user.id;
+    const { currentPassword, newPassword } = req.body;
+
+    // Récupérer l'admin avec son mot de passe actuel
+    const result = await query<Admin>(
+      'SELECT * FROM admins WHERE id = $1',
+      [adminId]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: 'Administrateur non trouvé'
+      });
+      return;
+    }
+
+    const admin = result.rows[0];
+
+    // Vérifier l'ancien mot de passe
+    const isValid = await verifyPassword(currentPassword, admin.password_hash);
+    if (!isValid) {
+      res.status(401).json({
+        success: false,
+        error: 'Mot de passe actuel incorrect'
+      });
+      return;
+    }
+
+    // Hasher et sauvegarder le nouveau
+    const newPasswordHash = await hashPassword(newPassword);
+
+    await query(
+      'UPDATE admins SET password_hash = $1, updated_at = NOW() WHERE id = $2',
+      [newPasswordHash, adminId]
+    );
+
+    res.json({
+      success: true,
+      message: 'Mot de passe modifié avec succès'
+    });
+  } catch (error) {
+    console.error('Erreur changePassword:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors du changement de mot de passe'
+    });
+  }
+};
+
+/**
  * Enregistre un rapport d'état des lieux (réception) pour une réservation
  * Les données sont stockées dans bookings.customer_data.reception_report
  */
@@ -126,7 +297,7 @@ export const adminUpdateAndConfirmBooking = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { service_id, start_datetime, technician_id, internal_notes } = req.body;
+    const { service_id, start_datetime, technician_id, internal_notes, duration } = req.body;
 
     const existingResult = await query<Booking>(
       'SELECT * FROM bookings WHERE id = $1',
@@ -160,10 +331,13 @@ export const adminUpdateAndConfirmBooking = async (
 
     const service = serviceResult.rows[0] as { duration_minutes: number };
 
+    // Utiliser la durée fournie ou celle du service par défaut
+    const durationToUse = duration ? parseInt(duration) : service.duration_minutes;
+
     const newStart = start_datetime
       ? new Date(start_datetime)
       : new Date(existingBooking.start_datetime as any);
-    const newEnd = addMinutes(newStart, service.duration_minutes);
+    const newEnd = addMinutes(newStart, durationToUse);
 
     const updateResult = await query<Booking>(
       `UPDATE bookings 
@@ -466,11 +640,12 @@ export const createAvailabilityBlock = async (
       end_datetime,
       reason,
       block_type,
+      service_type,
     } = req.body;
 
     const result = await query(
-      `INSERT INTO availability_blocks (store_id, technician_id, start_datetime, end_datetime, reason, block_type)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO availability_blocks (store_id, technician_id, start_datetime, end_datetime, reason, block_type, service_type)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
       [
         store_id,
@@ -479,6 +654,7 @@ export const createAvailabilityBlock = async (
         end_datetime,
         reason || null,
         block_type || 'other',
+        service_type || null,
       ],
     );
 

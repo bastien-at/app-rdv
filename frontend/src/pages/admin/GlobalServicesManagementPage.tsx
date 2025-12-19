@@ -22,6 +22,7 @@ import { Service, CreateServiceData, UpdateServiceData, Store } from '../../type
 export default function GlobalServicesManagementPage() {
   const navigate = useNavigate();
   const [services, setServices] = useState<Service[]>([]);
+  const [allServices, setAllServices] = useState<Service[]>([]);
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,7 +39,8 @@ export default function GlobalServicesManagementPage() {
     service_type: 'workshop' as 'fitting' | 'workshop',
     category: '',
     is_global: true,
-    is_active: true
+    is_active: true,
+    isEnabledForCurrentStore: false
   });
 
   useEffect(() => {
@@ -53,12 +55,23 @@ export default function GlobalServicesManagementPage() {
         getStores()
       ]);
       console.log('Services chargés:', servicesData);
-      console.log('Stores chargés:', storesData);
-      // Filtrer uniquement les services globaux
+      
+      // Filtrer uniquement les services globaux pour l'affichage principal
       const globalServices = servicesData.filter(s => s.is_global);
-      console.log('Services globaux:', globalServices);
       setServices(globalServices);
-      setStores(storesData);
+      
+      // Garder tous les services pour vérifier les activations locales
+      setAllServices(servicesData);
+
+      // Filtrer les magasins si c'est un admin de magasin
+      const role = localStorage.getItem('admin_role') || sessionStorage.getItem('admin_role');
+      const storeId = localStorage.getItem('admin_store_id') || sessionStorage.getItem('admin_store_id');
+
+      if (role === 'store_admin' && storeId) {
+        setStores(storesData.filter(store => store.id === storeId));
+      } else {
+        setStores(storesData);
+      }
     } catch (error) {
       console.error('Erreur chargement données:', error);
       alert(`Erreur lors du chargement des données: ${error}`);
@@ -67,7 +80,19 @@ export default function GlobalServicesManagementPage() {
     }
   };
 
+  const isServiceEnabledForStore = (service: Service, storeId: string): boolean => {
+    return allServices.some(s => 
+      s.store_id === storeId && 
+      s.name === service.name &&
+      !s.is_global &&
+      s.active
+    );
+  };
+
   const handleOpenModal = (service?: Service) => {
+    const storeId = localStorage.getItem('admin_store_id') || sessionStorage.getItem('admin_store_id');
+    const isEnabled = service && storeId ? isServiceEnabledForStore(service, storeId) : false;
+
     if (service) {
       setEditingService(service);
       setFormData({
@@ -78,7 +103,8 @@ export default function GlobalServicesManagementPage() {
         service_type: service.service_type,
         category: service.category || '',
         is_global: true,
-        is_active: service.active
+        is_active: service.active,
+        isEnabledForCurrentStore: isEnabled
       });
     } else {
       setEditingService(null);
@@ -90,7 +116,8 @@ export default function GlobalServicesManagementPage() {
         service_type: 'workshop',
         category: '',
         is_global: true,
-        is_active: true
+        is_active: true,
+        isEnabledForCurrentStore: false
       });
     }
     setShowModal(true);
@@ -103,8 +130,22 @@ export default function GlobalServicesManagementPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const storeId = localStorage.getItem('admin_store_id') || sessionStorage.getItem('admin_store_id');
     
     try {
+      // Gestion de l'activation/désactivation locale
+      if (storeId && editingService) {
+        const currentlyEnabled = isServiceEnabledForStore(editingService, storeId);
+        if (formData.isEnabledForCurrentStore !== currentlyEnabled) {
+          await handleToggleStoreService(storeId, formData.isEnabledForCurrentStore, editingService);
+        }
+      }
+
+      // Gestion de la mise à jour globale (si admin autorisé, ici simplifié)
+      // Note: Normalement, un store_admin ne devrait pas modifier le service global, 
+      // mais pour l'instant on garde la logique existante si on veut permettre l'édition du template global.
+      // Si on ne veut pas que le store_admin touche au global, on pourrait conditionner ce bloc.
+      
       if (editingService) {
         const updateData: UpdateServiceData = {
           name: formData.name,
@@ -126,7 +167,12 @@ export default function GlobalServicesManagementPage() {
           is_global: true,
           active: formData.is_active
         };
-        await createService(createData);
+        const newService = await createService(createData);
+        
+        // Si l'admin veut activer pour son magasin immédiatement à la création
+        if (storeId && formData.isEnabledForCurrentStore) {
+          await handleToggleStoreService(storeId, true, newService);
+        }
       }
       
       await loadData();
@@ -154,59 +200,81 @@ export default function GlobalServicesManagementPage() {
     setShowStoreModal(true);
   };
 
-  const handleToggleStoreService = async (storeId: string, enabled: boolean) => {
-    if (!selectedServiceForStores) return;
+  const handleToggleStoreService = async (storeId: string, enabled: boolean, serviceOverride?: Service) => {
+    const serviceToToggle = serviceOverride || selectedServiceForStores;
+    if (!serviceToToggle) return;
     
     try {
       if (enabled) {
         // Créer une copie du service pour ce magasin
         const createData: CreateServiceData = {
           store_id: storeId,
-          service_type: selectedServiceForStores.service_type,
-          name: selectedServiceForStores.name,
-          description: selectedServiceForStores.description,
-          price: selectedServiceForStores.price,
-          duration_minutes: selectedServiceForStores.duration_minutes,
-          category: selectedServiceForStores.category,
-          image_url: selectedServiceForStores.image_url,
+          service_type: serviceToToggle.service_type,
+          name: serviceToToggle.name,
+          description: serviceToToggle.description,
+          price: serviceToToggle.price,
+          duration_minutes: serviceToToggle.duration_minutes,
+          category: serviceToToggle.category,
+          image_url: serviceToToggle.image_url,
           is_global: false,
           active: true
         };
         await createService(createData);
       } else {
         // Trouver et supprimer le service de ce magasin
-        const storeService = services.find(s => 
+        const storeService = allServices.find(s => 
           s.store_id === storeId && 
-          s.name === selectedServiceForStores.name &&
+          s.name === serviceToToggle.name &&
           !s.is_global
         );
         if (storeService) {
           await deleteService(storeService.id);
         }
       }
-      await loadData();
+      // Pas de await loadData() ici si appelé depuis handleSubmit car loadData est appelé après
+      if (!serviceOverride) {
+        await loadData();
+      }
     } catch (error) {
       console.error('Erreur:', error);
-      alert('Erreur lors de la modification');
+      // Ne pas afficher l'alerte ici si appelé depuis handleSubmit pour gérer l'erreur globalement
+      if (!serviceOverride) throw error;
     }
   };
 
-  const isServiceEnabledForStore = (service: Service, storeId: string): boolean => {
-    return services.some(s => 
-      s.store_id === storeId && 
-      s.name === service.name &&
-      !s.is_global &&
-      s.active
-    );
+  const handleEnableAllForCurrentStore = async () => {
+    const storeId = localStorage.getItem('admin_store_id') || sessionStorage.getItem('admin_store_id');
+    if (!storeId) return;
+
+    try {
+      // Activer toutes les prestations affichées pour ce magasin
+      for (const service of displayedServices) {
+        const currentlyEnabled = isServiceEnabledForStore(service, storeId);
+        if (!currentlyEnabled) {
+          await handleToggleStoreService(storeId, true, service);
+        }
+      }
+      await loadData();
+      alert('Toutes les prestations visibles ont été activées pour votre magasin.');
+    } catch (error) {
+      console.error('Erreur activation globale pour le magasin:', error);
+      alert('Erreur lors de l\'activation des prestations pour le magasin');
+    }
   };
+
+  const [activeTab, setActiveTab] = useState<'all' | 'workshop' | 'fitting'>('all');
+
+  // ... (rest of the state and useEffects)
 
   const filteredServices = services.filter(service =>
     service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     (service.description?.toLowerCase() || '').includes(searchQuery.toLowerCase())
   );
 
-  const workshopServices = filteredServices.filter(s => s.service_type === 'workshop');
-  const fittingServices = filteredServices.filter(s => s.service_type === 'fitting');
+  const displayedServices = filteredServices.filter(service => {
+    if (activeTab === 'all') return true;
+    return service.service_type === activeTab;
+  });
 
   if (loading) {
     return (
@@ -231,25 +299,71 @@ export default function GlobalServicesManagementPage() {
               <h1 className="text-3xl font-bold text-gray-900">Gestion des prestations globales</h1>
               <p className="text-gray-500 mt-1">Créez et gérez les prestations disponibles pour vos magasins</p>
             </div>
-            <Button
-              onClick={() => handleOpenModal()}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Nouvelle prestation
-            </Button>
+            <div className="flex items-center gap-3">
+              {(localStorage.getItem('admin_store_id') || sessionStorage.getItem('admin_store_id')) && (
+                <Button
+                  variant="ghost"
+                  className="border border-gray-300 text-sm"
+                  onClick={handleEnableAllForCurrentStore}
+                >
+                  Activer toutes les prestations pour mon magasin
+                </Button>
+              )}
+              <Button
+                onClick={() => handleOpenModal()}
+                className="bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nouvelle prestation
+              </Button>
+            </div>
           </div>
 
-          {/* Search */}
-          <div className="mt-6">
-            <div className="relative">
+          {/* Tabs & Search */}
+          <div className="mt-8 flex flex-col sm:flex-row justify-between gap-4">
+            <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl">
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                  activeTab === 'all'
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Tout voir
+              </button>
+              <button
+                onClick={() => setActiveTab('workshop')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                  activeTab === 'workshop'
+                    ? 'bg-white text-green-700 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Wrench className="h-4 w-4" />
+                Atelier
+              </button>
+              <button
+                onClick={() => setActiveTab('fitting')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
+                  activeTab === 'fitting'
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                <Bike className="h-4 w-4" />
+                Étude posturale
+              </button>
+            </div>
+
+            <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
               <input
                 type="text"
-                placeholder="Rechercher une prestation..."
+                placeholder="Rechercher..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -258,157 +372,101 @@ export default function GlobalServicesManagementPage() {
 
       {/* Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Atelier */}
-        <div className="mb-12">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <Wrench className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Atelier mécanique</h2>
-              <p className="text-sm text-gray-500">{workshopServices.length} prestation(s)</p>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {workshopServices.map(service => (
-              <div
-                key={service.id}
-                className="bg-white rounded-2xl p-6 border-2 border-gray-200 hover:border-green-300 hover:shadow-lg transition-all"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">{service.name}</h3>
-                    <p className="text-sm text-gray-600">{service.description}</p>
-                  </div>
-                  {!service.active && (
-                    <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
-                      Inactif
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-4 mb-4 text-sm text-gray-600">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    <span>{service.duration_minutes} min</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Euro className="h-4 w-4" />
-                    <span className="font-bold text-gray-900">{service.price}€</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleManageStores(service)}
-                    className="flex-1 border-2 border-gray-300 hover:border-green-500 hover:bg-green-50"
-                  >
-                    <StoreIcon className="h-4 w-4 mr-2" />
-                    Magasins
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleOpenModal(service)}
-                    className="border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleDelete(service.id)}
-                    className="border-2 border-gray-300 hover:border-red-500 hover:bg-red-50 hover:text-red-600"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-
-            {workshopServices.length === 0 && (
-              <div className="col-span-full text-center py-12 bg-white rounded-2xl border-2 border-dashed border-gray-300">
-                <Wrench className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">Aucune prestation d'atelier</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Étude posturale */}
-        <div>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Bike className="h-6 w-6 text-blue-600" />
-            </div>
-            <div>
-              <h2 className="text-2xl font-bold text-gray-900">Étude posturale</h2>
-              <p className="text-sm text-gray-500">{fittingServices.length} prestation(s)</p>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {fittingServices.map(service => (
-              <div
-                key={service.id}
-                className="bg-white rounded-2xl p-6 border-2 border-gray-200 hover:border-blue-300 hover:shadow-lg transition-all"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-900 mb-2">{service.name}</h3>
-                    <p className="text-sm text-gray-600">{service.description}</p>
-                  </div>
-                  {!service.active && (
-                    <span className="px-2 py-1 bg-gray-100 text-gray-600 text-xs font-medium rounded-full">
-                      Inactif
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-4 mb-4 text-sm text-gray-600">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-4 w-4" />
-                    <span>{service.duration_minutes} min</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <Euro className="h-4 w-4" />
-                    <span className="font-bold text-gray-900">{service.price}€</span>
-                  </div>
-                </div>
-
-                <div className="flex gap-2">
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleManageStores(service)}
-                    className="flex-1 border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50"
-                  >
-                    <StoreIcon className="h-4 w-4 mr-2" />
-                    Magasins
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleOpenModal(service)}
-                    className="border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleDelete(service.id)}
-                    className="border-2 border-gray-300 hover:border-red-500 hover:bg-red-50 hover:text-red-600"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            ))}
-
-            {fittingServices.length === 0 && (
-              <div className="col-span-full text-center py-12 bg-white rounded-2xl border-2 border-dashed border-gray-300">
-                <Bike className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-500">Aucune prestation d'étude posturale</p>
-              </div>
-            )}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Service
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Description
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Durée
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Prix
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Statut
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {displayedServices.map((service) => (
+                  <tr key={service.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className={`flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center ${
+                          service.service_type === 'workshop' ? 'bg-green-100 text-green-600' : 'bg-blue-100 text-blue-600'
+                        }`}>
+                          {service.service_type === 'workshop' ? <Wrench className="h-5 w-5" /> : <Bike className="h-5 w-5" />}
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">{service.name}</div>
+                          <div className="text-xs text-gray-500 capitalize">
+                            {service.service_type === 'workshop' ? 'Atelier' : 'Étude posturale'}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-600 max-w-md truncate" title={service.description}>
+                        {service.description}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center text-sm text-gray-900">
+                        <Clock className="h-4 w-4 mr-1 text-gray-400" />
+                        {service.duration_minutes} min
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {service.price} €
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        service.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      }`}>
+                        {service.active ? 'Actif' : 'Inactif'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => handleOpenModal(service)}
+                          className="text-indigo-600 hover:text-indigo-900 p-2 hover:bg-indigo-50 rounded-lg transition-colors"
+                          title="Modifier"
+                        >
+                          <Edit2 className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(service.id)}
+                          className="text-red-600 hover:text-red-900 p-2 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Supprimer"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {displayedServices.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center text-gray-500">
+                      Aucune prestation trouvée
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -523,6 +581,22 @@ export default function GlobalServicesManagementPage() {
                   Prestation active (visible pour les clients)
                 </label>
               </div>
+
+              {/* Option d'activation pour le magasin courant */}
+              {(localStorage.getItem('admin_store_id') || sessionStorage.getItem('admin_store_id')) && (
+                <div className="flex items-center gap-3 pt-4 border-t border-gray-200">
+                  <input
+                    type="checkbox"
+                    id="isEnabledForCurrentStore"
+                    checked={formData.isEnabledForCurrentStore}
+                    onChange={(e) => setFormData({ ...formData, isEnabledForCurrentStore: e.target.checked })}
+                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  />
+                  <label htmlFor="isEnabledForCurrentStore" className="text-sm font-bold text-gray-900">
+                    Activer cette prestation pour mon magasin
+                  </label>
+                </div>
+              )}
             </form>
 
             <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">

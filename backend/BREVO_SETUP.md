@@ -56,38 +56,47 @@ Parfait pour le développement et les petits volumes !
 
 ## 🎨 Types d'emails envoyés
 
-### 1. Email de confirmation
+### 1. Email de réception de demande
 
-- Envoyé après la création d'une réservation
+- Envoyé **immédiatement** après la demande de réservation par le client
+- Statut : "En attente de validation"
+- Confirme la bonne prise en compte de la demande
+
+### 2. Email de confirmation
+
+- Envoyé après la **validation** de la réservation par un admin
 - Contient les détails du RDV
 - Inclut un fichier .ics pour ajouter au calendrier
 - Boutons "Modifier" et "Annuler"
 
-### 2. Email d'annulation
+### 3. Email d'annulation
 
 - Envoyé après l'annulation d'une réservation
 - Contient les détails de la réservation annulée
 - Bouton "Prendre un nouveau rendez-vous"
 
-### 3. Email de rappel (optionnel)
+### 4. Email de rappel (optionnel)
 
 - Peut être envoyé 2 jours et 1 jour avant le RDV
 - Rappelle les détails et ce qu'il faut apporter
 
-## 🔧 Personnalisation des templates
+## 🔧 Fonctionnement Technique
 
-Les templates HTML sont dans `src/utils/email.ts`. Vous pouvez les personnaliser :
+Le système utilise l'API v3 de Brevo via des requêtes HTTP directes (`fetch`) plutôt que le SDK Node.js, pour garantir une meilleure compatibilité et résoudre les problèmes d'authentification.
 
-- **Couleurs** : Modifiez les couleurs dans les styles CSS inline
-- **Logo** : Ajoutez votre logo en haut des emails
-- **Contenu** : Adaptez les textes selon vos besoins
+Les fonctions d'envoi sont situées dans `src/utils/email.ts`.
 
 ## 🐛 Dépannage
 
-### Erreur "Invalid API key"
+### Erreur "BREVO_API_KEY non configurée"
 
-- Vérifiez que `BREVO_API_KEY` est bien définie dans `.env`
-- Vérifiez que la clé API est correcte (pas d'espaces)
+- Vérifiez que `BREVO_API_KEY` est bien définie dans votre fichier `.env` à la racine du dossier `backend`.
+- Assurez-vous de redémarrer le serveur après toute modification du fichier `.env`.
+
+### Erreur "authentication not found in headers" (401)
+
+- Vérifiez que votre clé API est correcte et commence par `xkeysib-`.
+- Le système force désormais l'envoi du header `api-key` via `fetch`, ce problème ne devrait plus survenir avec la nouvelle implémentation.
 
 ### Emails non reçus
 

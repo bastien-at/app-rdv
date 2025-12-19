@@ -270,7 +270,7 @@ const seed = async () => {
       console.log(`  ✓ ${store.name} créé`);
     }
 
-    // 2. Créer les services pour chaque magasin
+    // 2. Créer les services
     console.log('🚴 Création des services...');
     
     const services = [
@@ -296,54 +296,101 @@ const seed = async () => {
         duration_minutes: 150,
         price: 180.00,
       },
-      // Services d'atelier
+      // Services d'atelier - Forfaits
       {
         service_type: 'workshop',
-        name: 'Révision complète',
-        description: 'Révision complète de votre vélo : nettoyage, graissage, réglages freins et vitesses, contrôle de sécurité.',
+        name: 'Forfait Atelier Bronze',
+        description: 'Contrôle et gonflage des pneumatiques, Réglage dérailleur, Réglage des freins, Vérification des serrages',
+        duration_minutes: 45,
+        price: 50.00,
+      },
+      {
+        service_type: 'workshop',
+        name: 'Forfait Atelier Argent',
+        description: 'Contrôle et gonflage des pneumatiques, Réglage dérailleur, Réglage des freins, Vérification des serrages, Dévoilage des roues, Nettoyage et lubrification de la transmission',
+        duration_minutes: 75,
+        price: 70.00,
+      },
+      {
+        service_type: 'workshop',
+        name: 'Forfait Atelier Or',
+        description: 'Prestations Argent + Graissage sur l’ensemble du vélo',
+        duration_minutes: 105,
+        price: 95.00,
+      },
+      {
+        service_type: 'workshop',
+        name: 'Forfait Atelier Platine',
+        description: 'Prestations Or + Changement câbles et gaines, Vidange et remplacement du liquide hydraulique',
+        duration_minutes: 180,
+        price: 170.00,
+      },
+      // Services d'atelier - Autres prestations
+      {
+        service_type: 'workshop',
+        name: "Main d'oeuvre (1h)",
+        description: 'Taux horaire pour prestations hors forfait (69€/h, min 15 min)',
         duration_minutes: 60,
-        price: 80.00,
+        price: 69.00,
       },
       {
         service_type: 'workshop',
-        name: 'Réparation crevaison',
-        description: 'Réparation ou remplacement de chambre à air, vérification des pneus.',
+        name: 'Montage accessoire',
+        description: 'Montage d\'un accessoire sur le vélo',
+        duration_minutes: 15,
+        price: 19.00,
+      },
+      {
+        service_type: 'workshop',
+        name: 'Devis',
+        description: 'Établissement d\'un devis (remboursé si réparation effectuée)',
+        duration_minutes: 20,
+        price: 30.00,
+      },
+      {
+        service_type: 'workshop',
+        name: 'Montage vélo complet',
+        description: 'Montage complet d\'un vélo',
+        duration_minutes: 150,
+        price: 199.00,
+      },
+      {
+        service_type: 'workshop',
+        name: 'Nettoyage',
+        description: 'Nettoyage complet du vélo',
         duration_minutes: 30,
-        price: 25.00,
-      },
-      {
-        service_type: 'workshop',
-        name: 'Réglage transmission',
-        description: 'Réglage précis des dérailleurs avant et arrière, ajustement des câbles.',
-        duration_minutes: 45,
-        price: 40.00,
-      },
-      {
-        service_type: 'workshop',
-        name: 'Réglage freins',
-        description: 'Réglage freins à disque ou patins, purge si nécessaire (supplément selon modèle).',
-        duration_minutes: 45,
         price: 45.00,
       },
       {
         service_type: 'workshop',
-        name: 'Montage vélo neuf',
-        description: 'Montage et réglages complets d\'un vélo neuf acheté chez Alltricks.',
-        duration_minutes: 90,
-        price: 60.00,
+        name: 'Gardiennage vélo',
+        description: 'Frais de garde par jour (5€/jour)',
+        duration_minutes: 15,
+        price: 5.00,
       },
     ];
 
+    // 2a. Créer les services globaux (catalogue)
+    for (const service of services) {
+      await query(
+        `INSERT INTO services (store_id, service_type, name, description, duration_minutes, price, is_global)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        [null, service.service_type, service.name, service.description, service.duration_minutes, service.price, true]
+      );
+    }
+    console.log(`  ✓ ${services.length} services globaux créés`);
+
+    // 2b. Créer les services pour chaque magasin
     for (const storeId of storeIds) {
       for (const service of services) {
         await query(
-          `INSERT INTO services (store_id, service_type, name, description, duration_minutes, price)
-           VALUES ($1, $2, $3, $4, $5, $6)`,
-          [storeId, service.service_type, service.name, service.description, service.duration_minutes, service.price]
+          `INSERT INTO services (store_id, service_type, name, description, duration_minutes, price, is_global)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [storeId, service.service_type, service.name, service.description, service.duration_minutes, service.price, false]
         );
       }
     }
-    console.log(`  ✓ ${services.length} services créés par magasin`);
+    console.log(`  ✓ ${services.length} services locaux créés par magasin`);
 
     // 3. Créer les techniciens
     console.log('👨‍🔧 Création des techniciens...');

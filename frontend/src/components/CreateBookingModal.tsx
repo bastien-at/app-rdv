@@ -4,8 +4,9 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Button from './Button';
 import Input from './Input';
+import CustomerAutocomplete from './CustomerAutocomplete';
 import { getStores, getStoreServices, getAvailability, createBooking } from '../services/api';
-import { Store, Service, TimeSlot, CreateBookingData } from '../types';
+import { Store, Service, TimeSlot, CreateBookingData, CustomerSearchResult } from '../types';
 
 interface CreateBookingModalProps {
   isOpen: boolean;
@@ -177,6 +178,21 @@ export default function CreateBookingModal({ isOpen, onClose, onSuccess }: Creat
     if (step === 'customer') setStep('datetime');
     else if (step === 'datetime') setStep('service');
     else if (step === 'service') setStep('store');
+  };
+
+  const handleCustomerSelect = (customer: CustomerSearchResult) => {
+    setCustomerData({
+      firstname: customer.firstname,
+      lastname: customer.lastname,
+      email: customer.email,
+      phone: customer.phone,
+      height: '',
+      weight: '',
+      shoeSize: '',
+      practiceFrequency: '',
+      painDescription: '',
+      bikeInfo: 'own'
+    });
   };
 
   if (!isOpen) return null;
@@ -365,6 +381,22 @@ export default function CreateBookingModal({ isOpen, onClose, onSuccess }: Creat
               <h3 className="text-lg font-semibold mb-4">Informations client</h3>
               
               <div className="space-y-4">
+                {/* Recherche de client existant */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Rechercher un client existant
+                  </label>
+                  <CustomerAutocomplete
+                    storeId={selectedStore?.id || ''}
+                    onSelect={handleCustomerSelect}
+                    placeholder="Tapez un nom, email ou téléphone..."
+                    className="mb-4"
+                  />
+                  <div className="text-center text-sm text-gray-500 mb-4">
+                    ou
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                   <Input
                     label="Prénom *"

@@ -204,8 +204,8 @@ export const createStore = async (
     const result = await query<Store>(
       `INSERT INTO stores (
         name, address, city, postal_code, phone, email,
-        latitude, longitude, opening_hours, active
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+        latitude, longitude, opening_hours, active, workshop_capacity
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
       RETURNING *`,
       [
         storeData.name,
@@ -218,6 +218,7 @@ export const createStore = async (
         storeData.longitude || null,
         JSON.stringify(storeData.opening_hours),
         storeData.active !== false,
+        storeData.workshop_capacity || 1,
       ]
     );
     
@@ -307,6 +308,24 @@ export const updateStore = async (
     if (updateData.active !== undefined) {
       updates.push(`active = $${paramIndex}`);
       values.push(updateData.active);
+      paramIndex++;
+    }
+
+    if (updateData.has_workshop !== undefined) {
+      updates.push(`has_workshop = $${paramIndex}`);
+      values.push(updateData.has_workshop);
+      paramIndex++;
+    }
+
+    if (updateData.has_fitting !== undefined) {
+      updates.push(`has_fitting = $${paramIndex}`);
+      values.push(updateData.has_fitting);
+      paramIndex++;
+    }
+
+    if (updateData.workshop_capacity !== undefined) {
+      updates.push(`workshop_capacity = $${paramIndex}`);
+      values.push(updateData.workshop_capacity);
       paramIndex++;
     }
     

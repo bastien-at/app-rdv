@@ -155,9 +155,7 @@ END:VCALENDAR`;
                   <ServiceIcon className="h-8 w-8" />
                 </div>
                 <p className="text-sm text-white/80 mb-2">{booking.store_name}</p>
-                <h1 className="text-4xl font-bold mb-3">
-                  À très bientôt !
-                </h1>
+          
                 <p className="text-lg text-white/90">
                   Nous avons hâte de vous accueillir
                 </p>
@@ -183,14 +181,14 @@ END:VCALENDAR`;
                 </div>
               ) : (
                 <div className="text-center">
-                  <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle className="h-8 w-8 text-green-600" />
+                  <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Clock className="h-8 w-8 text-orange-600" />
                   </div>
                   <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                    Votre réservation est confirmée !
+                    Votre réservation est en attente de validation
                   </h2>
                   <p className="text-gray-600 mb-1">
-                    Nous avons envoyé la confirmation à
+                    Nous vous enverrons un email de confirmation à
                   </p>
                   <p className="text-blue-600 font-medium">
                     {booking.customer_email}

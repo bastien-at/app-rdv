@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { Bike, CheckCircle, Wrench, ArrowRight, MapPin, Clock, Star } from 'lucide-react';
 import Button from '../components/Button';
+import Badge from '../components/Badge';
 
 export default function ModernHomePage() {
   const navigate = useNavigate();
@@ -53,7 +54,7 @@ export default function ModernHomePage() {
               </Button>
               <Button
                 size="lg"
-                onClick={() => navigate('/stores')}
+                onClick={() => window.open('https://www.alltricks.fr/surl/magasins', '_blank')}
                 className="border-2 border-white bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 text-lg px-8 py-4"
               >
                 Découvrir nos magasins
@@ -208,7 +209,7 @@ export default function ModernHomePage() {
                   title: 'Sélectionnez votre service',
                   description: 'Étude posturale ou atelier mécanique, puis votre créneau',
                   icon: Clock,
-                  color: 'blue'
+                  color: 'orange'
                 },
                 {
                   step: '3',
@@ -222,12 +223,18 @@ export default function ModernHomePage() {
                   {index < 2 && (
                     <div className="hidden md:block absolute top-12 left-full w-full h-0.5 bg-gradient-to-r from-gray-300 to-transparent -translate-y-1/2 z-0"></div>
                   )}
-                  <div className="relative bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow">
+                  <div className="relative bg-white rounded-2xl p-8 shadow-lg hover:shadow-xl transition-shadow h-full flex flex-col">
                     <div className={`w-12 h-12 bg-${item.color}-100 rounded-xl flex items-center justify-center mb-6`}>
-                      <item.icon className={`h-6 w-6 text-${item.color}-600`} />
+                      <item.icon className={`h-6 w-6 text-${item.color}-500`} />
                     </div>
-                    <div className={`inline-block px-3 py-1 bg-${item.color}-500 text-white rounded-full text-sm font-bold mb-4`}>
-                      Étape {item.step}
+                    <div className="mb-4">
+                      <Badge variant={
+                        item.color === 'green' ? 'success' : 
+                        item.color === 'orange' ? 'warning' : 
+                        'info'
+                      }>
+                        Étape {item.step}
+                      </Badge>
                     </div>
                     <h3 className="text-xl font-bold mb-3 text-gray-900">
                       {item.title}

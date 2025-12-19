@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, ChevronRight, Search, Phone, Mail, Clock, ArrowRight } from 'lucide-react';
+import { MapPin, ChevronRight, Search, Phone, Mail, Clock, ArrowRight, ChevronLeft, HelpCircle, Truck, MessageSquare, CreditCard, RotateCcw } from 'lucide-react';
 import Button from '../components/Button';
 import { getStores } from '../services/api';
 import { Store } from '../types';
@@ -43,20 +43,21 @@ export default function ModernStoresPage() {
     }
   };
 
+  const getCurrentDayHours = (openingHours: any) => {
+    if (!openingHours) return 'Horaires non disponibles';
+    
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const currentDay = days[new Date().getDay()];
+    const hours = openingHours[currentDay];
+
+    if (!hours || hours.closed) return 'Fermé aujourd\'hui';
+    return `Aujourd'hui : ${hours.open} - ${hours.close}`;
+  };
+
   const filteredStores = stores.filter(store =>
     store.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     store.city.toLowerCase().includes(searchQuery.toLowerCase())
   );
-
-  const getStoreImage = (city: string) => {
-    // Images différentes selon la ville
-    const images: Record<string, string> = {
-      'lyon': 'https://images.unsplash.com/photo-1499856871958-5b9627545d1a?w=800&q=80',
-      'paris': 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=800&q=80',
-      'marseille': 'https://images.unsplash.com/photo-1508050919630-b135583b29ab?w=800&q=80',
-    };
-    return images[city.toLowerCase()] || 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=800&q=80';
-  };
 
   if (loading) {
     return (
@@ -71,46 +72,33 @@ export default function ModernStoresPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-blue-600 to-indigo-600 text-white py-20">
-        <div className="absolute inset-0 overflow-hidden">
-          <div className="absolute -top-1/2 -right-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl"></div>
-          <div className="absolute -bottom-1/2 -left-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl"></div>
-        </div>
-
-        <div className="container mx-auto px-4 relative z-10">
-          {/* Header avec logo */}
-          <div className="flex items-center justify-between mb-10">
-            <img
-              src="/assets/logo_alltricks.png"
-              alt="Alltricks"
-              className="h-14 w-auto opacity-90 hover:opacity-100 transition-opacity cursor-pointer"
+      {/* Header */}
+      <div className="bg-[#005162] text-white border-b border-[#004552] sticky top-0 z-50">
+        <div className="container mx-auto px-4 flex items-center justify-between h-14">
+          <div className="w-[180px] flex justify-start">
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full hover:bg-white/20 transition-all text-white font-bold text-sm"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Retour à l'accueil</span>
+            </button>
+          </div>
+          
+          <div className="flex-1 flex justify-center">
+            <img 
+              src="/assets/logo_alltricks.png" 
+              alt="Alltricks" 
+              className="h-6 w-auto cursor-pointer"
               onClick={() => navigate('/')}
             />
           </div>
 
-          <div className="max-w-3xl mx-auto text-center">
-            <h1 className="text-4xl md:text-6xl font-bold mb-6">
-              Choisissez votre magasin
-            </h1>
-            <p className="text-xl text-blue-100 mb-8">
-              Sélectionnez le magasin le plus proche pour votre réservation
-            </p>
-            
-            {/* Barre de recherche */}
-            <div className="relative max-w-xl mx-auto">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Rechercher par ville ou nom..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 py-4 rounded-2xl text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-blue-300/50 shadow-xl"
-              />
-            </div>
-          </div>
+          <div className="w-[180px]" />
         </div>
-      </section>
+      </div>
+
+
 
       {/* Liste des magasins */}
       <section className="py-16">
@@ -125,89 +113,48 @@ export default function ModernStoresPage() {
                 <div
                   key={store.id}
                   onClick={() => navigate(`/stores/${cityToSlug(store.city)}`)}
-                  className="group bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-300 cursor-pointer transform hover:-translate-y-1"
+                  className="group bg-white rounded-[8px] overflow-hidden shadow-[0px_8px_8px_0px_rgba(20,33,41,0.1)] hover:shadow-xl transition-all duration-300 cursor-pointer flex flex-col h-full"
                 >
-                  {/* Image */}
-                  <div className="relative h-48 overflow-hidden">
-                    <img
-                      src={getStoreImage(store.city)}
-                      alt={store.city}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <h3 className="text-2xl font-bold text-white mb-1">
-                        {store.city}
+                  <div className="p-6 flex flex-col flex-1">
+                    {/* Tag & Title */}
+                    <div className="mb-4">
+          
+                      <h3 className="text-[20px] font-extrabold text-[#142129] leading-6 tracking-wide mb-2 font-['Overpass']">
+                        {store.name}
                       </h3>
-                      <p className="text-white/90 text-sm">{store.name}</p>
-                    </div>
-                  </div>
-
-                  {/* Contenu */}
-                  <div className="p-6">
-                    {/* Adresse */}
-                    <div className="flex items-start gap-3 mb-4">
-                      <MapPin className="h-5 w-5 text-blue-500 flex-shrink-0 mt-0.5" />
-                      <div className="text-sm text-gray-600">
-                        <p>{store.address}</p>
-                        <p>{store.postal_code} {store.city}</p>
-                      </div>
+                      <p className="text-[14px] text-[#142129] leading-[18px]">
+                        {store.address}<br />
+                        {store.postal_code} {store.city}
+                      </p>
                     </div>
 
-                    {/* Horaires */}
-                    {store.opening_hours && (
-                      <div className="mb-6">
-                        <div className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-2">
+                    {/* Footer Info (Horaires summary) */}
+                    <div className="mt-auto pt-4 border-t border-gray-100">
+                      <div className="flex items-center justify-between gap-4 mb-4">
+                        <div className="flex items-center gap-2 text-[14px] text-[#687787]">
                           <Clock className="h-4 w-4" />
-                          <span>Horaires d'ouverture</span>
+                          <span>
+                            {getCurrentDayHours(store.opening_hours)}
+                          </span>
                         </div>
-                        <div className="text-sm text-gray-600 space-y-1">
-                          {Object.entries(store.opening_hours)
-                            .sort(([dayA], [dayB]) => orderedDays.indexOf(dayA) - orderedDays.indexOf(dayB))
-                            .map(([day, hours]: [string, any]) => (
-                              <div key={day} className="flex justify-between">
-                                <span>{dayLabels[day] ?? day}</span>
-                                <span>
-                                  {hours.closed ? 'Fermé' : `${hours.open} - ${hours.close}`}
-                                </span>
-                              </div>
-                            ))}
+                        <div className="flex items-center gap-1 text-[14px] text-[#687787]">
+                          <MapPin className="h-4 w-4" />
+                          <span>{store.postal_code}</span>
                         </div>
                       </div>
-                    )}
 
-                    {/* Bouton */}
-                    <Button
-                      fullWidth
-                      className="group-hover:bg-blue-600 group-hover:scale-105 transition-all"
-                    >
-                      Réserver
-                      <ArrowRight className="ml-2 h-4 w-4 group-hover:translate-x-1 transition-transform" />
-                    </Button>
+                      <Button
+                        fullWidth
+                        className="bg-[#005162] text-white hover:bg-[#003a46] shadow-none hover:shadow-md rounded-full py-3 h-auto font-bold text-[16px]"
+                      >
+                        Réserver
+                      </Button>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           )}
-        </div>
-      </section>
-
-      {/* CTA */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Besoin d'aide pour choisir ?
-          </h2>
-          <p className="text-gray-600 mb-8 max-w-2xl mx-auto">
-            Notre équipe est à votre disposition pour vous conseiller et vous orienter vers le magasin le plus adapté à vos besoins
-          </p>
-          <Button
-            size="lg"
-            variant="ghost"
-            className="border-2 border-blue-600 text-blue-600 hover:bg-blue-50"
-          >
-            Nous contacter
-          </Button>
         </div>
       </section>
     </div>

@@ -84,8 +84,7 @@ PostgreSQL (Railway/Render)
    FRONTEND_URL=https://votre-app.vercel.app
    ADMIN_TOKEN=votre-token-secret-admin
    BREVO_API_KEY=votre-cle-brevo
-   BREVO_SENDER_EMAIL=noreply@votredomaine.com
-   BREVO_SENDER_NAME=Votre Entreprise
+   EMAIL_FROM=noreply@votredomaine.com
    ```
 
 7. **Générer le domaine** : Railway vous donnera une URL type `https://xxx.railway.app`

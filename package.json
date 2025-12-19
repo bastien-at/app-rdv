@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Application de réservation de créneaux d'étude posturale (bike fitting)",
   "private": true,
+  
   "workspaces": [
     "frontend",
     "backend"
@@ -12,9 +13,17 @@
     "dev:backend": "cd backend && npm run dev",
     "dev:frontend": "cd frontend && npm run dev",
     "build": "npm run build --workspace=backend && npm run build --workspace=frontend",
-    "start": "npm run start --workspace=backend"
+    "start": "npm run start --workspace=backend",
+    "docs:jsdoc": "jsdoc -c jsdoc.conf.json",
+    "build-storybook": "storybook build"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
+  },
+  "dependencies": {
+    "jspdf": "^3.0.4",
+    "jspdf-autotable": "^5.0.2"
   }
+
+  
 }

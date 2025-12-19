@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Clock, User, Calendar as CalendarIcon, Mail, Phone, Bike, Wrench, Check, MapPin } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, User, Calendar as CalendarIcon, Mail, Phone, Bike, Wrench, Check, MapPin, Search, HelpCircle } from 'lucide-react';
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, isBefore, startOfDay, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Button from '../components/Button';
 import Input from '../components/Input';
-import { getStoreById, getStoreBySlug, getStoreServices, getAvailability, createBooking } from '../services/api';
-import { Store, Service, TimeSlot, CreateBookingData } from '../types';
+import Stepper from '../components/Stepper';
+import { getStoreById, getStoreBySlug, getStoreServices, getAvailability, createBooking, searchCustomers } from '../services/api';
+import { Store, Service, TimeSlot, CreateBookingData, CustomerSearchResult } from '../types';
 
 type Step = 'service' | 'date' | 'form' | 'confirmation';
 
@@ -17,6 +18,11 @@ export default function ModernBookingPage() {
   const serviceType = searchParams.get('type') as 'fitting' | 'workshop' | null;
   const [storeId, setStoreId] = useState<string | null>(null);
   
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+  const [customerSearchResults, setCustomerSearchResults] = useState<CustomerSearchResult[]>([]);
+  const [showCustomerResults, setShowCustomerResults] = useState(false);
+
   const [step, setStep] = useState<Step>('service');
   const [store, setStore] = useState<Store | null>(null);
   const [services, setServices] = useState<Service[]>([]);
@@ -42,6 +48,43 @@ export default function ModernBookingPage() {
     bikeInfo: 'own',
     acceptTerms: false,
   });
+
+  useEffect(() => {
+    const token = localStorage.getItem('admin_token');
+    setIsAdmin(!!token);
+  }, []);
+
+  useEffect(() => {
+    const search = async () => {
+      if (customerSearchQuery.length >= 2 && storeId) {
+        try {
+          const results = await searchCustomers(storeId, customerSearchQuery);
+          setCustomerSearchResults(results);
+          setShowCustomerResults(true);
+        } catch (error) {
+          console.error('Erreur recherche client:', error);
+        }
+      } else {
+        setCustomerSearchResults([]);
+        setShowCustomerResults(false);
+      }
+    };
+
+    const timeoutId = setTimeout(search, 300);
+    return () => clearTimeout(timeoutId);
+  }, [customerSearchQuery, storeId]);
+
+  const handleCustomerSelect = (customer: CustomerSearchResult) => {
+    setFormData(prev => ({
+      ...prev,
+      firstname: customer.firstname,
+      lastname: customer.lastname,
+      email: customer.email,
+      phone: customer.phone,
+    }));
+    setCustomerSearchQuery('');
+    setShowCustomerResults(false);
+  };
 
   useEffect(() => {
     if (storeSlug) {
@@ -90,9 +133,18 @@ export default function ModernBookingPage() {
       ]);
       setStore(storeData);
       
+      // Filtrer les services selon la configuration du magasin
+      let availableServices = servicesData;
+      if (storeData.has_workshop === false) {
+        availableServices = availableServices.filter((s: any) => s.service_type !== 'workshop');
+      }
+      if (storeData.has_fitting === false) {
+        availableServices = availableServices.filter((s: any) => s.service_type !== 'fitting');
+      }
+
       const filteredServices = serviceType 
-        ? servicesData.filter((s: any) => s.service_type === serviceType)
-        : servicesData;
+        ? availableServices.filter((s: any) => s.service_type === serviceType)
+        : availableServices;
       
       setServices(filteredServices);
       
@@ -216,137 +268,122 @@ export default function ModernBookingPage() {
     );
   }
 
-  const steps = [
-    { id: 'service', label: 'Service', completed: step !== 'service' },
-    { id: 'date', label: 'Date & Heure', completed: step === 'form' || step === 'confirmation' },
-    { id: 'form', label: 'Informations', completed: step === 'confirmation' },
+  const getStepStatus = (stepId: string): 'upcoming' | 'current' | 'completed' => {
+    const order = ['service', 'date', 'form', 'confirmation'];
+    const currentIndex = order.indexOf(step);
+    const stepIndex = order.indexOf(stepId);
+    
+    if (stepIndex < currentIndex) return 'completed';
+    if (stepIndex === currentIndex) return 'current';
+    return 'upcoming';
+  };
+
+  const stepperSteps = [
+    { id: 'service', label: 'Service', status: getStepStatus('service') },
+    { id: 'date', label: 'Date & Heure', status: getStepStatus('date') },
+    { id: 'form', label: 'Informations', status: getStepStatus('form') },
   ];
 
   const getHeroImage = () => {
-    if (serviceType === 'fitting') {
-      return 'https://images.unsplash.com/photo-1541625602330-2277a4c46182?w=800&q=80';
-    }
-    return 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=800&q=80';
-  };
-
-  const getHeroTitle = () => {
-    if (serviceType === 'fitting') {
-      return 'Optimisez votre position';
-    }
-    return 'Votre vélo entre de bonnes mains';
-  };
-
-  const getHeroSubtitle = () => {
-    if (serviceType === 'fitting') {
-      return 'Une étude posturale sur-mesure pour plus de confort et de performance';
-    }
-    return 'Entretien et réparation par nos mécaniciens experts';
+    return '/assets/hero-booking.png';
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header avec retour */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <button
-            onClick={() => navigate(-1)}
-            className="flex items-center text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            <ChevronLeft className="h-5 w-5 mr-1" />
-            Retour
-          </button>
+    <div className="flex flex-col h-screen bg-[#eff1f3] overflow-hidden">
+      {/* Header */}
+      <div className="bg-[#005162] text-white border-b border-[#004552] flex-shrink-0">
+        <div className="container mx-auto px-4 flex items-center justify-between h-14">
+          <div className="w-[180px] flex justify-start">
+            <button
+              onClick={() => navigate(-1)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-white/20 transition-all text-white font-bold text-sm"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Retour</span>
+            </button>
+          </div>
+          
+          <div className="flex-1 flex justify-center">
             <img 
               src="/assets/logo_alltricks.png" 
               alt="Alltricks" 
-              className="h-10 w-auto"
+              className="h-12 w-auto cursor-pointer"
+              onClick={() => navigate('/stores')}
             />
+          </div>
+
+          <div className="w-[180px]" />
+        </div>
       </div>
 
-      {/* Contenu principal */}
-      <div className="w-full px-4 py-8">
-        <div>
-          <div>
-            {/* Stepper de progression */}
-            <div className="mb-4">
-              <div className="max-w-xl mx-auto flex items-center justify-between">
-                {steps.map((s, index) => (
-                  <div key={s.id} className="flex items-center flex-1">
-                    <div className="flex flex-col items-center flex-1">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold transition-all ${
-                        s.completed 
-                          ? 'bg-blue-500 text-white' 
-                          : s.id === step
-                          ? 'bg-blue-100 text-blue-600 ring-4 ring-blue-100'
-                          : 'bg-gray-200 text-gray-400'
-                      }`}>
-                        {s.completed ? <Check className="h-5 w-5" /> : index + 1}
-                      </div>
-                      <span className={`text-xs mt-2 font-medium ${
-                        s.id === step ? 'text-gray-900' : 'text-gray-500'
-                      }`}>
-                        {s.label}
-                      </span>
-                    </div>
-                    {index < steps.length - 1 && (
-                      <div className={`h-0.5 flex-1 mx-2 ${
-                        s.completed ? 'bg-blue-500' : 'bg-gray-200'
-                      }`} />
-                    )}
-                  </div>
-                ))}
-              </div>
+      {/* Main Content - Split Layout */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Left Column - Visuals (Desktop only) */}
+        <div className="hidden lg:block lg:w-[45%] relative bg-gray-900 overflow-hidden">
+          <div className="absolute inset-0">
+            <img 
+              src={getHeroImage()} 
+              alt="Hero" 
+              className="w-full h-full object-cover object-right opacity-80"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+          </div>
+        </div>
+
+        {/* Right Column - Form */}
+        <div className="w-full lg:w-[55%] overflow-y-auto bg-[#eff1f3]">
+          <div className="max-w-2xl mx-auto px-4 py-6">
+            
+            {/* Stepper */}
+            <div className="mb-6">
+              <Stepper steps={stepperSteps} />
             </div>
 
+            {/* Store Info Card */}
             {store && (
-              <div className="mb-8 flex justify-center">
-                <div className="inline-flex items-start gap-3 px-4 py-3 rounded-xl bg-blue-50 border border-blue-100 shadow-sm">
-                  <div className="mt-0.5">
-                    <MapPin className="h-4 w-4 text-blue-500" />
-                  </div>
-                  <div className="text-sm text-gray-700">
-                    <div className="font-semibold text-gray-900">
-                      {store.name}
-                    </div>
-                    <div className="text-xs text-gray-600">
-                      {store.address}<br />
-                      {store.postal_code} {store.city}
-                    </div>
-                  </div>
+              <div className="mb-4 bg-white rounded-xl p-3 shadow-sm border border-gray-200 flex items-start gap-3">
+                <div className="p-1.5 bg-[#f0f7f9] rounded-lg">
+                  <MapPin className="h-4 w-4 text-[#005162]" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-[#142129] text-sm">{store.name}</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    {store.address}, {store.postal_code} {store.city}
+                  </p>
                 </div>
               </div>
             )}
-            </div>
-            {/* Contenu selon l'étape */}
-            <div className="bg-white rounded-2xl shadow-lg p-8">
-              
-              {/* Étape 1: Sélection du service */}
+
+            {/* Step Content */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
               {step === 'service' && (
-                <div>
-                  <h2 className="text-2xl font-bold mb-6">Choisissez votre service</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-4">
+                  <h2 className="text-xl font-extrabold text-[#142129]">Choisissez votre service</h2>
+                  <div className="space-y-3">
                     {services.map((service) => (
                       <button
                         key={service.id}
                         onClick={() => handleServiceSelect(service)}
-                        className="w-full h-full text-left p-6 border-2 border-gray-200 rounded-xl hover:border-blue-500 hover:bg-blue-50 transition-all group flex flex-col justify-between"
+                        className="w-full text-left p-4 border border-gray-200 rounded-lg hover:border-[#005162] hover:ring-1 hover:ring-[#005162] hover:bg-[#f0f7f9] transition-all group flex flex-col gap-2"
                       >
-                        <div className="flex items-start justify-between gap-4">
-                          <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-blue-600">
+                        <div className="flex items-start justify-between w-full">
+                          <div>
+                            <h3 className="text-base font-bold text-[#142129] group-hover:text-[#005162] mb-1">
                               {service.name}
                             </h3>
-                            <p className="text-sm text-gray-600 mb-3">
+                            <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">
                               {service.description}
                             </p>
                           </div>
-                          <ChevronRight className="h-6 w-6 text-gray-400 group-hover:text-blue-600 transition-colors flex-shrink-0" />
+                          <ChevronRight className="h-4 w-4 text-gray-400 group-hover:text-[#005162] flex-shrink-0 mt-0.5" />
                         </div>
-                        <div className="mt-4 flex items-center justify-between gap-4">
-                          <span className="flex items-center text-sm text-gray-500">
-                            <Clock className="h-4 w-4 mr-1" />
+                        <div className="w-full h-px bg-gray-100" />
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="flex items-center text-gray-600">
+                            <Clock className="h-3 w-3 mr-1.5" />
                             {service.duration_minutes} min
                           </span>
-                          <span className="text-2xl font-bold text-blue-600">
+                          <span className="font-bold text-[#005162] text-base">
                             {service.price}€
                           </span>
                         </div>
@@ -356,49 +393,50 @@ export default function ModernBookingPage() {
                 </div>
               )}
 
-              {/* Étape 2: Sélection date et créneau */}
               {step === 'date' && selectedService && (
                 <div>
-                  <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h2 className="text-2xl font-bold">Date & Heure</h2>
-                      <p className="text-sm text-gray-600">{selectedService.name} - {selectedService.price}€</p>
+                      <h2 className="text-xl font-extrabold text-[#142129]">Date & Heure</h2>
+                      <p className="text-sm text-gray-500">{selectedService.name} - {selectedService.price}€</p>
                     </div>
                     <button
                       onClick={() => setStep('service')}
-                      className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                      className="text-xs text-[#005162] font-semibold hover:underline"
                     >
                       Modifier
                     </button>
                   </div>
 
-                  <div className="grid md:grid-cols-2 gap-8 items-start">
-                    {/* Calendrier */}
+                  <div className="grid lg:grid-cols-2 gap-6">
+                    {/* Calendar */}
                     <div>
                       <div className="flex items-center justify-between mb-4">
                         <button
                           onClick={previousMonth}
-                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                          className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
                         >
-                          <ChevronLeft className="h-5 w-5" />
+                          <ChevronLeft className="h-4 w-4" />
                         </button>
-                        <h3 className="font-semibold text-lg">
+                        <h3 className="font-bold text-base capitalize">
                           {format(currentMonth, 'MMMM yyyy', { locale: fr })}
                         </h3>
                         <button
                           onClick={nextMonth}
-                          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                          className="p-1.5 hover:bg-gray-100 rounded-full transition-colors"
                         >
-                          <ChevronRight className="h-5 w-5" />
+                          <ChevronRight className="h-4 w-4" />
                         </button>
                       </div>
 
-                      <div className="grid grid-cols-7 gap-2">
+                      <div className="grid grid-cols-7 gap-1 mb-1">
                         {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((day, i) => (
-                          <div key={i} className="text-center text-xs font-medium text-gray-500 py-2">
+                          <div key={i} className="text-center text-[10px] font-semibold text-gray-400 py-1">
                             {day}
                           </div>
                         ))}
+                      </div>
+                      <div className="grid grid-cols-7 gap-1">
                         {getDaysInMonth().map((day, i) => {
                           const isPast = isBefore(day, startOfDay(new Date()));
                           const isSelected = selectedDate && isSameDay(day, selectedDate);
@@ -406,7 +444,6 @@ export default function ModernBookingPage() {
                           const isSunday = day.getDay() === 0;
                           const dayStr = format(day, 'yyyy-MM-dd');
                           const isFullyBooked = fullyBookedDates.has(dayStr);
-
                           const isDisabled = isPast || isSunday || isFullyBooked;
 
                           return (
@@ -414,15 +451,16 @@ export default function ModernBookingPage() {
                               key={i}
                               onClick={() => !isDisabled && handleDateSelect(day)}
                               disabled={isDisabled}
-                              className={`aspect-square rounded-lg text-sm font-medium transition-all ${
-                                isDisabled
-                                  ? 'text-gray-300 cursor-not-allowed'
+                              className={`aspect-square rounded-md text-xs font-medium transition-all
+                                ${isDisabled 
+                                  ? 'text-gray-300 cursor-not-allowed' 
                                   : isSelected
-                                  ? 'bg-blue-600 text-white shadow-lg scale-105'
-                                  : isCurrentDay
-                                  ? 'bg-blue-100 text-blue-600 hover:bg-blue-200'
-                                  : 'hover:bg-gray-100 text-gray-700'
-                              }`}
+                                    ? 'bg-[#005162] text-white shadow-md'
+                                    : isCurrentDay
+                                      ? 'bg-[#f0f7f9] text-[#005162]'
+                                      : 'hover:bg-gray-100 text-gray-700'
+                                }
+                              `}
                             >
                               {format(day, 'd')}
                             </button>
@@ -431,36 +469,34 @@ export default function ModernBookingPage() {
                       </div>
                     </div>
 
-                    {/* Créneaux horaires */}
+                    {/* Slots */}
                     <div>
-                      <h3 className="font-semibold mb-3">Créneaux disponibles</h3>
+                      <h3 className="font-bold text-[#142129] mb-3 text-sm">Créneaux disponibles</h3>
                       {loading ? (
-                        <div className="text-center py-8">
-                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+                        <div className="flex justify-center py-4">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#005162]"></div>
                         </div>
                       ) : availableSlots.length === 0 ? (
-                        <p className="text-center text-gray-500 py-8">Aucun créneau disponible ce jour</p>
+                        <div className="text-center py-6 text-sm text-gray-500 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                          Aucun créneau disponible
+                        </div>
                       ) : (
-                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2 mb-6">
+                        <div className="grid grid-cols-3 gap-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
                           {availableSlots.map((slot, i) => {
                             const isBooked = slot.available === false;
-
                             return (
                               <button
                                 key={i}
-                                onClick={() => {
-                                  if (!isBooked) {
-                                    handleSlotSelect(slot);
-                                  }
-                                }}
+                                onClick={() => !isBooked && handleSlotSelect(slot)}
                                 disabled={isBooked}
-                                className={`py-3 px-4 rounded-lg text-sm font-medium transition-all ${
-                                  isBooked
+                                className={`py-1.5 px-1 rounded-md text-xs font-medium transition-all
+                                  ${isBooked
                                     ? 'bg-gray-100 text-gray-400 cursor-not-allowed line-through'
                                     : selectedSlot === slot
-                                    ? 'bg-blue-600 text-white shadow-md'
-                                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                                }`}
+                                      ? 'bg-[#005162] text-white shadow-sm'
+                                      : 'bg-white border border-gray-200 text-gray-700 hover:border-[#005162] hover:text-[#005162]'
+                                  }
+                                `}
                               >
                                 {format(new Date(slot.start_datetime), 'HH:mm')}
                               </button>
@@ -473,7 +509,7 @@ export default function ModernBookingPage() {
                         <Button
                           fullWidth
                           onClick={handleContinueToForm}
-                          className="mt-4"
+                          className="mt-4 bg-[#005162] hover:bg-[#004552] py-2 text-sm"
                         >
                           Continuer
                         </Button>
@@ -483,32 +519,71 @@ export default function ModernBookingPage() {
                 </div>
               )}
 
-              {/* Étape 3: Formulaire */}
               {step === 'form' && (
-                <div>
-                  <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-2xl font-bold">Vos informations</h2>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-extrabold text-[#142129]">Vos informations</h2>
                     <button
                       onClick={() => setStep('date')}
-                      className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+                      className="text-xs text-[#005162] font-semibold hover:underline"
                     >
                       Modifier
                     </button>
                   </div>
 
+                  {isAdmin && (
+                    <div className="bg-[#f0f7f9] p-3 rounded-lg border border-[#b3d4db]">
+                      <label className="block text-xs font-bold text-[#005162] mb-1.5">
+                        Rechercher un client existant (Admin)
+                      </label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Nom, email ou téléphone..."
+                          value={customerSearchQuery}
+                          onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                          className="w-full pl-9 pr-3 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-2 focus:ring-[#005162] focus:border-transparent"
+                        />
+                        {showCustomerResults && customerSearchResults.length > 0 && (
+                          <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                            {customerSearchResults.map((customer) => (
+                              <button
+                                key={customer.id}
+                                onClick={() => handleCustomerSelect(customer)}
+                                className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                              >
+                                <div className="font-medium text-gray-900 text-sm">
+                                  {customer.firstname} {customer.lastname}
+                                </div>
+                                <div className="text-xs text-gray-500 flex items-center gap-2">
+                                  <span>{customer.email}</span>
+                                  <span>•</span>
+                                  <span>{customer.phone}</span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <Input
                         label="Prénom *"
                         value={formData.firstname}
                         onChange={(e) => setFormData({ ...formData, firstname: e.target.value })}
                         required
+                        className="!py-1.5 !text-sm"
                       />
                       <Input
                         label="Nom *"
                         value={formData.lastname}
                         onChange={(e) => setFormData({ ...formData, lastname: e.target.value })}
                         required
+                        className="!py-1.5 !text-sm"
                       />
                     </div>
 
@@ -518,6 +593,7 @@ export default function ModernBookingPage() {
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       required
+                      className="!py-1.5 !text-sm"
                     />
 
                     <Input
@@ -526,72 +602,19 @@ export default function ModernBookingPage() {
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                       required
+                      className="!py-1.5 !text-sm"
                     />
 
-                    {serviceType === 'fitting' && (
-                      <>
-                        <div className="grid grid-cols-3 gap-4">
-                          <Input
-                            label="Taille (cm)"
-                            type="number"
-                            value={formData.height}
-                            onChange={(e) => setFormData({ ...formData, height: e.target.value })}
-                          />
-                          <Input
-                            label="Poids (kg)"
-                            type="number"
-                            value={formData.weight}
-                            onChange={(e) => setFormData({ ...formData, weight: e.target.value })}
-                          />
-                          <Input
-                            label="Pointure"
-                            type="number"
-                            value={formData.shoeSize}
-                            onChange={(e) => setFormData({ ...formData, shoeSize: e.target.value })}
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Fréquence de pratique
-                          </label>
-                          <select
-                            value={formData.practiceFrequency}
-                            onChange={(e) => setFormData({ ...formData, practiceFrequency: e.target.value })}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                          >
-                            <option value="">Sélectionnez</option>
-                            <option value="occasional">Occasionnel (1-2x/mois)</option>
-                            <option value="regular">Régulier (1-2x/semaine)</option>
-                            <option value="intensive">Intensif (3+/semaine)</option>
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Douleurs ou gênes
-                          </label>
-                          <textarea
-                            value={formData.painDescription}
-                            onChange={(e) => setFormData({ ...formData, painDescription: e.target.value })}
-                            rows={3}
-                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            placeholder="Décrivez vos éventuelles douleurs..."
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    <div className="flex items-start gap-3 pt-4">
+                    <div className="flex items-start gap-2 pt-1">
                       <input
                         type="checkbox"
                         id="terms"
                         checked={formData.acceptTerms}
                         onChange={(e) => setFormData({ ...formData, acceptTerms: e.target.checked })}
-                        className="mt-1"
+                        className="mt-1 h-3.5 w-3.5 text-[#005162] border-gray-300 rounded focus:ring-[#005162]"
                         required
                       />
-                      <label htmlFor="terms" className="text-sm text-gray-600">
+                      <label htmlFor="terms" className="text-xs text-gray-600">
                         J'accepte les conditions générales et la politique de confidentialité *
                       </label>
                     </div>
@@ -599,8 +622,9 @@ export default function ModernBookingPage() {
                     <Button
                       type="submit"
                       fullWidth
+                      size="sm"
                       disabled={submitting}
-                      className="mt-6"
+                      className="mt-4 bg-[#005162] hover:bg-[#004552]"
                     >
                       {submitting ? 'Réservation en cours...' : 'Confirmer la réservation'}
                     </Button>

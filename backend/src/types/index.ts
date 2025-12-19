@@ -12,6 +12,9 @@ export interface Store {
   longitude?: number;
   opening_hours: OpeningHours;
   active: boolean;
+  has_workshop?: boolean;
+  has_fitting?: boolean;
+  workshop_capacity?: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -134,6 +137,7 @@ export interface AvailabilityBlock {
   end_datetime: Date;
   reason?: string;
   created_at: Date;
+  service_type?: 'fitting' | 'workshop';
 }
 
 export interface EmailLog {
@@ -169,6 +173,7 @@ export interface BookingLock {
   session_id: string;
   expires_at: Date;
   created_at: Date;
+  service_type?: 'fitting' | 'workshop';
 }
 
 // Types pour les requêtes API
@@ -252,6 +257,9 @@ export interface CreateStoreData {
   longitude?: number;
   opening_hours: OpeningHours;
   active?: boolean;
+  has_workshop?: boolean;
+  has_fitting?: boolean;
+  workshop_capacity?: number;
 }
 
 export interface UpdateStoreData {
@@ -265,6 +273,9 @@ export interface UpdateStoreData {
   longitude?: number;
   opening_hours?: OpeningHours;
   active?: boolean;
+  has_workshop?: boolean;
+  has_fitting?: boolean;
+  workshop_capacity?: number;
 }
 
 export interface BookingStats {
@@ -293,4 +304,54 @@ export interface PaginatedResponse<T> {
   page: number;
   limit: number;
   total_pages: number;
+}
+
+// Types pour l'annuaire des clients
+export interface CustomerDirectory {
+  id: string;
+  store_id: string;
+  firstname: string;
+  lastname: string;
+  email: string;
+  phone: string;
+  first_booking_id?: string;
+  total_bookings: number;
+  last_booking_date?: Date;
+  notes?: string;
+  active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
+export interface CustomerDirectoryWithStore extends CustomerDirectory {
+  store_name?: string;
+  store_city?: string;
+}
+
+export interface CreateCustomerData {
+  store_id: string;
+  firstname: string;
+  lastname: string;
+  email: string;
+  phone: string;
+  notes?: string;
+}
+
+export interface UpdateCustomerData {
+  firstname?: string;
+  lastname?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  active?: boolean;
+}
+
+export interface CustomerSearchResult {
+  id: string;
+  firstname: string;
+  lastname: string;
+  email: string;
+  phone: string;
+  total_bookings: number;
+  last_booking_date?: Date;
 }

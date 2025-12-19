@@ -108,6 +108,7 @@ export default function AdminLoginPage() {
               </label>
               <button
                 type="button"
+                onClick={() => navigate('/admin/forgot-password')}
                 className="text-blue-600 hover:text-blue-700 font-medium"
               >
                 Mot de passe oublié ?
@@ -130,9 +131,7 @@ export default function AdminLoginPage() {
           </form>
         </Card>
 
-        <p className="text-center text-sm text-gray-600 mt-6">
-          Comptes de test : admin@alltricks.com / admin123
-        </p>
+      
       </div>
     </div>
   );

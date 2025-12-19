@@ -20,6 +20,7 @@ Application web complète de réservation de créneaux d'étude posturale (bike 
 - ✅ Gestion du planning et des créneaux
 - ✅ Gestion des réservations (validation, annulation, reprogrammation)
 - ✅ Configuration des services et horaires
+- ✅ Configuration avancée du magasin (Services actifs, Capacité atelier)
 - ✅ Reporting et statistiques
 
 ## 🛠️ Stack Technique
@@ -28,7 +29,7 @@ Application web complète de réservation de créneaux d'étude posturale (bike 
 - **Backend**: Node.js + Express + TypeScript
 - **Base de données**: PostgreSQL (Supabase)
 - **Auth**: JWT
-- **Email**: Nodemailer
+- **Email**: Brevo API (via fetch)
 - **Calendar**: react-big-calendar + date-fns
 - **ORM**: node-postgres (pg)
 
@@ -185,14 +186,20 @@ Tables principales :
 - `availability_blocks` - Blocages de créneaux
 - `email_logs` - Logs des emails envoyés
 
-## 📧 Configuration Email
+## 📧 Configuration Email (Brevo)
 
-Pour Gmail, créer un "App Password" :
+Le système utilise Brevo (anciennement Sendinblue) pour l'envoi d'emails transactionnels.
 
-1. Activer la validation en 2 étapes
-2. Aller dans "Sécurité" > "Mots de passe des applications"
-3. Générer un mot de passe pour l'application
-4. Utiliser ce mot de passe dans `SMTP_PASS`
+1.  Créer un compte sur [Brevo](https://www.brevo.com/)
+2.  Générer une clé API v3
+3.  Ajouter les variables dans `.env` :
+
+```env
+BREVO_API_KEY=xkeysib-votre-cle-api
+EMAIL_FROM=noreply@votre-domaine.com
+```
+
+Voir `backend/BREVO_SETUP.md` pour plus de détails.
 
 ## 🧪 Tests
 

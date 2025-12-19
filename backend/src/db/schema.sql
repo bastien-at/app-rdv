@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS stores (
   opening_hours JSONB NOT NULL DEFAULT '{}', 
   -- Format: {"monday": {"open": "09:00", "close": "19:00", "closed": false}, ...}
   active BOOLEAN DEFAULT true,
+  has_workshop BOOLEAN DEFAULT true,
+  has_fitting BOOLEAN DEFAULT true,
+  workshop_capacity INTEGER DEFAULT 1,
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -80,6 +83,7 @@ CREATE TABLE IF NOT EXISTS availability_blocks (
   end_datetime TIMESTAMP NOT NULL,
   reason VARCHAR(255),
   block_type VARCHAR(50) DEFAULT 'other',
+  service_type VARCHAR(50),
   created_at TIMESTAMP DEFAULT NOW(),
   CONSTRAINT block_no_overlap CHECK (start_datetime < end_datetime)
 );
@@ -121,6 +125,7 @@ CREATE TABLE IF NOT EXISTS booking_locks (
   end_datetime TIMESTAMP NOT NULL,
   session_id VARCHAR(255) NOT NULL,
   expires_at TIMESTAMP NOT NULL,
+  service_type VARCHAR(50),
   created_at TIMESTAMP DEFAULT NOW()
 );
 

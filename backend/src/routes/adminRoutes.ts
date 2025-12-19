@@ -1,6 +1,9 @@
 import express from 'express';
 import {
   login,
+  forgotPassword,
+  resetPassword,
+  changePassword,
   getAllBookings,
   getStoreBookings,
   updateBookingStatus,
@@ -28,13 +31,17 @@ import {
   validateAdminUpdateAndConfirmBooking,
 } from '../middleware/validation';
 
-const router = express.Router();
+// Route de login séparée (pas de middleware authenticate)
+const loginRouter = express.Router();
+loginRouter.post('/login', validateAdminLogin, login);
 
-// POST /api/admin/login - Connexion admin
-router.post('/login', validateAdminLogin, login);
+const router = express.Router();
 
 // Routes protégées (nécessitent authentification)
 router.use(authenticate);
+
+// PUT /api/admin/change-password - Changer le mot de passe de l'admin connecté
+router.put('/change-password', changePassword);
 
 // GET /api/admin/bookings - Toutes les réservations (dashboard)
 router.get('/bookings', getAllBookings);
@@ -50,6 +57,9 @@ router.put('/bookings/:id/confirm', validateAdminUpdateAndConfirmBooking, adminU
 
 // POST /api/admin/bookings/:id/reception-report - Enregistrer un état des lieux
 router.post('/bookings/:id/reception-report', saveReceptionReport);
+
+// GET /api/admin/stores/:storeId/availability-blocks - Blocages d'un magasin
+router.get('/stores/:storeId/availability-blocks', requireStoreAccess, getStoreAvailabilityBlocks);
 
 // POST /api/admin/availability-blocks - Créer un blocage
 router.post('/availability-blocks', validateCreateBlock, createAvailabilityBlock);
@@ -74,7 +84,7 @@ router.delete('/admins/:id', requireSuperAdmin, deleteAdmin);
 router.post('/stores', requireSuperAdmin, createStore);
 
 // PUT /api/admin/stores/:id - Mettre à jour un magasin
-router.put('/stores/:id', requireSuperAdmin, updateStore);
+router.put('/stores/:id', requireStoreAccess, updateStore);
 
 // DELETE /api/admin/stores/:id - Supprimer un magasin
 router.delete('/stores/:id', requireSuperAdmin, deleteStore);
@@ -82,4 +92,4 @@ router.delete('/stores/:id', requireSuperAdmin, deleteStore);
 // GET /api/admin/stores/:storeId/stats - Statistiques d'un magasin
 router.get('/stores/:storeId/stats', requireStoreAccess, getStoreStats);
 
-export default router;
+export { router, loginRouter };

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Bike, Wrench, MapPin, Phone, Mail, Clock, Star, ArrowRight, CheckCircle, Calendar } from 'lucide-react';
+import { Bike, Wrench, MapPin, Phone, Mail, Clock, Star, ArrowRight, CheckCircle, Calendar, ChevronLeft, HelpCircle } from 'lucide-react';
 import Button from '../components/Button';
 import { getStoreBySlug, getStoreById } from '../services/api';
 import { Store } from '../types';
@@ -35,6 +35,17 @@ export default function StoreLandingPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getCurrentDayHours = (openingHours: any) => {
+    if (!openingHours) return 'Horaires non disponibles';
+    
+    const days = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+    const currentDay = days[new Date().getDay()];
+    const hours = openingHours[currentDay];
+
+    if (!hours || hours.closed) return 'Fermé aujourd\'hui';
+    return `Aujourd'hui : ${hours.open} - ${hours.close}`;
   };
 
   const getStoreImage = (city: string) => {
@@ -96,110 +107,117 @@ export default function StoreLandingPage() {
         'Pièces garanties'
       ]
     }
-  ];
+  ].filter(service => {
+    if (service.id === 'fitting') return store.has_fitting !== false;
+    if (service.id === 'workshop') return store.has_workshop !== false;
+    return true;
+  });
+
+  const servicesContainerClass = services.length === 1
+    ? 'grid grid-cols-1 gap-8 max-w-3xl mx-auto'
+    : 'grid md:grid-cols-2 gap-8 max-w-6xl mx-auto';
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Hero Section */}
-      <section className="relative h-screen min-h-[700px] flex items-center">
-        <div className="absolute inset-0">
-          <img
-            src={getStoreImage(store.city)}
-            alt={store.city}
-            className="w-full h-full object-cover"
-          />
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-900/95 via-blue-800/90 to-indigo-900/95" />
-        </div>
+    <div className="min-h-screen bg-white">
+      {/* Header */}
+      <div className="bg-[#005162] text-white border-b border-[#004552] sticky top-0 z-50">
+        <div className="container mx-auto px-4 flex items-center justify-between h-14">
+          <div className="w-[180px] flex justify-start">
+            <button
+              onClick={() => navigate('/stores')}
+              className="flex items-center gap-2 bg-white/10 px-3 py-1.5 rounded-full hover:bg-white/20 transition-all text-white font-bold text-sm"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span className="hidden sm:inline">Retour</span>
+            </button>
+          </div>
+          
+          <div className="flex-1 flex justify-center">
+            <img 
+              src="/assets/logo_alltricks.png" 
+              alt="Alltricks" 
+              className="h-6 w-auto cursor-pointer"
+              onClick={() => navigate('/')}
+            />
+          </div>
 
-        {/* Logo Alltricks en haut */}
-        <div className="absolute top-8 left-8 z-20">
-          <img 
-            src="/assets/logo_alltricks.png" 
-            alt="Alltricks" 
-            className="h-16 w-auto opacity-90 hover:opacity-100 transition-opacity"
-          />
+          <div className="w-[180px]" />
         </div>
+      </div>
+
+      {/* Hero Section Simplifiée */}
+      <section className="relative pt-20 pb-16 overflow-hidden">
+        {/* Fond décoratif subtil */}
+        <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-b from-blue-50 to-white -z-10" />
         
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-4xl">
+          <div className="max-w-4xl mx-auto text-center">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-full text-white border border-white/20 mb-6">
+            <div className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full text-blue-600 border border-blue-100 shadow-sm mb-8">
               <MapPin className="h-4 w-4" />
-              <span className="text-sm font-medium">{store.city}</span>
+              <span className="text-sm font-semibold uppercase tracking-wide">{store.city}</span>
             </div>
             
             {/* Titre */}
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 text-white leading-tight">
+            <h1 className="text-5xl md:text-7xl font-bold mb-6 text-gray-900 leading-tight tracking-tight">
               {store.name}
             </h1>
             
-            <p className="text-xl md:text-2xl mb-4 text-blue-100">
+            <p className="text-xl md:text-2xl mb-6 text-blue-600 font-medium">
               Réservez votre créneau en ligne
             </p>
             
-            <p className="text-lg text-blue-200 mb-10 max-w-2xl">
-              Étude posturale professionnelle et atelier mécanique expert. Prenez rendez-vous en 2 minutes.
+            <p className="text-lg text-gray-600 mb-12 max-w-2xl mx-auto leading-relaxed">
+              Étude posturale professionnelle et atelier mécanique expert.<br/>
+              Prenez rendez-vous en 2 minutes dans votre magasin.
             </p>
             
             {/* CTA Buttons */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-16">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
               <Button
                 size="lg"
                 onClick={() => navigate(`/stores/${storeSlug}/booking?type=fitting`)}
-                className="bg-white text-blue-600 hover:bg-blue-50 shadow-2xl group text-lg px-8 py-4"
+                className="shadow-xl hover:shadow-2xl transition-all px-8 py-6 h-auto text-lg"
               >
-                <Bike className="mr-2 h-5 w-5" />
+                <Bike className="mr-2 h-6 w-6" />
                 Étude posturale
-                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </Button>
               <Button
                 size="lg"
+                variant="secondary"
                 onClick={() => navigate(`/stores/${storeSlug}/booking?type=workshop`)}
-                className="bg-green-500 text-white hover:bg-green-600 shadow-2xl group text-lg px-8 py-4"
+                className="px-8 py-6 h-auto text-lg border-2"
               >
-                <Wrench className="mr-2 h-5 w-5" />
+                <Wrench className="mr-2 h-6 w-6" />
                 Atelier mécanique
-                <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
               </Button>
             </div>
 
             {/* Infos rapides */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl">
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-                <div className="flex items-center gap-3 text-white">
-                  <MapPin className="h-5 w-5 text-blue-300" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow text-left">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-blue-50 rounded-xl">
+                    <MapPin className="h-6 w-6 text-blue-600" />
+                  </div>
                   <div>
-                    <p className="text-sm text-blue-200">Adresse</p>
-                    <p className="font-medium">{store.address}</p>
+                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Adresse</p>
+                    <p className="font-medium text-gray-900 text-lg">{store.address}</p>
                   </div>
                 </div>
               </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-                <div className="flex items-center gap-3 text-white">
-                  <Phone className="h-5 w-5 text-blue-300" />
-                  <div>
-                    <p className="text-sm text-blue-200">Téléphone</p>
-                    <p className="font-medium">{store.phone}</p>
+              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow text-left">
+                <div className="flex items-start gap-4">
+                  <div className="p-3 bg-blue-50 rounded-xl">
+                    <Clock className="h-6 w-6 text-blue-600" />
                   </div>
-                </div>
-              </div>
-              <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-4 border border-white/20">
-                <div className="flex items-center gap-3 text-white">
-                  <Clock className="h-5 w-5 text-blue-300" />
                   <div>
-                    <p className="text-sm text-blue-200">Ouvert</p>
-                    <p className="font-medium">Lun-Sam 9h-19h</p>
+                    <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-1">Ouvert</p>
+                    <p className="font-medium text-gray-900 text-lg">{getCurrentDayHours(store.opening_hours)}</p>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Scroll indicator */}
-        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-          <div className="w-6 h-10 border-2 border-white/30 rounded-full flex items-start justify-center p-2">
-            <div className="w-1 h-3 bg-white/50 rounded-full"></div>
           </div>
         </div>
       </section>
@@ -216,7 +234,7 @@ export default function StoreLandingPage() {
             </p>
           </div>
           
-          <div className="grid md:grid-cols-2 gap-8 max-w-6xl mx-auto">
+          <div className={servicesContainerClass}>
             {services.map((service) => {
               const Icon = service.icon;
               return (
@@ -271,7 +289,7 @@ export default function StoreLandingPage() {
       </section>
 
       {/* Pourquoi nous choisir */}
-      <section className="py-24 bg-gray-50">
+      {/* <section className="py-24 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-bold mb-4 text-gray-900">
@@ -311,65 +329,9 @@ export default function StoreLandingPage() {
             ))}
           </div>
         </div>
-      </section>
+      </section> */}
 
-      {/* CTA Final */}
-      <section className="py-24 bg-gradient-to-br from-blue-600 to-indigo-600 text-white">
-        <div className="container mx-auto px-4 text-center">
-          <h2 className="text-4xl md:text-5xl font-bold mb-6">
-            Prêt à réserver ?
-          </h2>
-          <p className="text-xl text-blue-100 mb-10 max-w-2xl mx-auto">
-            Choisissez votre service et réservez votre créneau dès maintenant
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button
-              size="lg"
-              onClick={() => navigate(`/stores/${storeSlug}/booking?type=fitting`)}
-              className="bg-white text-blue-600 hover:bg-blue-50 shadow-2xl text-lg px-8 py-4"
-            >
-              <Bike className="mr-2 h-5 w-5" />
-              Étude posturale
-            </Button>
-            <Button
-              size="lg"
-              onClick={() => navigate(`/stores/${storeSlug}/booking?type=workshop`)}
-              className="bg-green-500 text-white hover:bg-green-600 shadow-2xl text-lg px-8 py-4"
-            >
-              <Wrench className="mr-2 h-5 w-5" />
-              Atelier mécanique
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Contact */}
-      <section className="py-16 bg-white border-t border-gray-200">
-        <div className="container mx-auto px-4">
-          <div className="max-w-4xl mx-auto">
-            <div className="grid md:grid-cols-3 gap-8 text-center">
-              <div>
-                <MapPin className="h-6 w-6 text-blue-600 mx-auto mb-3" />
-                <h3 className="font-semibold text-gray-900 mb-2">Adresse</h3>
-                <p className="text-gray-600 text-sm">
-                  {store.address}<br />
-                  {store.postal_code} {store.city}
-                </p>
-              </div>
-              <div>
-                <Phone className="h-6 w-6 text-blue-600 mx-auto mb-3" />
-                <h3 className="font-semibold text-gray-900 mb-2">Téléphone</h3>
-                <p className="text-gray-600 text-sm">{store.phone}</p>
-              </div>
-              <div>
-                <Mail className="h-6 w-6 text-blue-600 mx-auto mb-3" />
-                <h3 className="font-semibold text-gray-900 mb-2">Email</h3>
-                <p className="text-gray-600 text-sm">{store.email}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+  
     </div>
   );
 }

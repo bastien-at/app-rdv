@@ -117,19 +117,20 @@ curl -X POST http://localhost:3000/api/bookings \
   }'
 ```
 
-## 📧 Configuration Email
+## 📧 Configuration Email (Brevo)
 
-Pour activer l'envoi d'emails, configurez dans `.env` :
+Pour activer l'envoi d'emails transactionnels :
+
+1.  Créer un compte sur [Brevo](https://www.brevo.com/)
+2.  Récupérer une clé API v3
+3.  Configurer dans `.env` :
 
 ```env
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your-email@gmail.com
-SMTP_PASS=your-app-password
+BREVO_API_KEY=xkeysib-votre-cle-api
 EMAIL_FROM=noreply@alltricks.com
 ```
 
-**Pour Gmail** : Créez un "App Password" dans les paramètres de sécurité.
+Voir `backend/BREVO_SETUP.md` pour les détails.
 
 ## 🏗️ Structure du projet
 
@@ -221,7 +222,7 @@ npm install
 
 ### 🚧 Phase 2 (À venir)
 
-- [ ] Rappels automatiques J-2 et J-1
+- [x] Rappels automatiques J-2 et J-1
 - [ ] Reporting avancé
 - [ ] Gestion des blocages de disponibilité
 - [ ] Interface admin complète

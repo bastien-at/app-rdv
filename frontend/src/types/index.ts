@@ -10,6 +10,9 @@ export interface Store {
   longitude?: number;
   opening_hours: OpeningHours;
   active: boolean;
+  has_workshop?: boolean;
+  has_fitting?: boolean;
+  workshop_capacity?: number;
 }
 
 export interface OpeningHours {
@@ -109,6 +112,12 @@ export interface CustomerData {
   pain_description?: string;
   bike_info?: string;
   objectives?: string;
+  reception_report?: {
+    workPerformed?: string;
+    inspectionId?: string;
+    // Add other fields if necessary
+    [key: string]: any;
+  };
 }
 
 export interface Booking {
@@ -158,6 +167,7 @@ export interface CreateAdminData {
   store_id?: string;
   role: 'super_admin' | 'store_admin';
   active?: boolean;
+  password?: string;
 }
 
 export interface UpdateAdminData {
@@ -166,6 +176,7 @@ export interface UpdateAdminData {
   store_id?: string;
   role?: 'super_admin' | 'store_admin';
   active?: boolean;
+  password?: string;
 }
 
 export interface CreateStoreData {
@@ -177,6 +188,8 @@ export interface CreateStoreData {
   email: string;
   opening_hours: OpeningHours;
   active?: boolean;
+  has_workshop?: boolean;
+  has_fitting?: boolean;
 }
 
 export interface ApiResponse<T = any> {
@@ -184,4 +197,59 @@ export interface ApiResponse<T = any> {
   data?: T;
   error?: string;
   message?: string;
+}
+
+// Types pour l'annuaire des clients
+export interface CustomerDirectory {
+  id: string;
+  store_id: string;
+  firstname: string;
+  lastname: string;
+  email: string;
+  phone: string;
+  first_booking_id?: string;
+  total_bookings: number;
+  last_booking_date?: string;
+  notes?: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
+  store_name?: string;
+  store_city?: string;
+}
+
+export interface CreateCustomerData {
+  store_id: string;
+  firstname: string;
+  lastname: string;
+  email: string;
+  phone: string;
+  notes?: string;
+}
+
+export interface UpdateCustomerData {
+  firstname?: string;
+  lastname?: string;
+  email?: string;
+  phone?: string;
+  notes?: string;
+  active?: boolean;
+}
+
+export interface CustomerSearchResult {
+  id: string;
+  firstname: string;
+  lastname: string;
+  email: string;
+  phone: string;
+  total_bookings: number;
+  last_booking_date?: string;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  limit: number;
+  total_pages: number;
 }

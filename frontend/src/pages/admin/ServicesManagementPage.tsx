@@ -35,6 +35,7 @@ export default function ServicesManagementPage() {
     duration_minutes: '',
     service_type: 'workshop' as 'fitting' | 'workshop',
     category: '',
+    image_url: '',
     is_global: false,
     is_active: true
   });
@@ -66,6 +67,7 @@ export default function ServicesManagementPage() {
         duration_minutes: service.duration_minutes.toString(),
         service_type: service.service_type,
         category: service.category || '',
+        image_url: service.image_url || '',
         is_global: service.is_global,
         is_active: service.active
       });
@@ -78,6 +80,7 @@ export default function ServicesManagementPage() {
         duration_minutes: '',
         service_type: 'workshop',
         category: '',
+        image_url: '',
         is_global: false,
         is_active: true
       });
