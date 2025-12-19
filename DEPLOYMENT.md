@@ -2,28 +2,29 @@
 
 ## 📋 Pré-requis
 
-- Compte Vercel (frontend)
-- Compte Railway / Render / Heroku (backend + PostgreSQL)
-- Git configuré
+- Repository GitHub cloné : `https://github.com/bastien-at/app-rdv.git`
 - Node.js 18+
+- PostgreSQL managé (Railway / Render / autre) ou auto-hébergé
+- Un PaaS pour le backend (Railway, Render, Fly.io, etc.)
+- Un hébergeur pour le frontend (Vercel, Netlify, PaaS HTTP, etc.)
 
 ---
 
 ## 🎯 Architecture de Déploiement
 
 ```
-Frontend (Vercel)
+Frontend (Vercel ou équivalent)
   ↓ API calls
-Backend (Railway/Render)
+Backend (Railway/Render/Fly.io/...)
   ↓ Database
-PostgreSQL (Railway/Render)
+PostgreSQL (Railway/Render ou instance dédiée)
 ```
 
 ---
 
 ## 1️⃣ Déploiement de la Base de Données
 
-### Option A : Railway (Recommandé)
+### Option A : Railway (exemple)
 
 1. **Créer un compte** sur [railway.app](https://railway.app)
 
@@ -53,7 +54,7 @@ PostgreSQL (Railway/Render)
 
 ---
 
-## 2️⃣ Déploiement du Backend
+## 2️⃣ Déploiement du Backend (dossier `backend/`)
 
 ### Sur Railway
 
@@ -100,9 +101,9 @@ PostgreSQL (Railway/Render)
 
 ---
 
-## 3️⃣ Déploiement du Frontend
+## 3️⃣ Déploiement du Frontend (dossier `frontend/`)
 
-### Sur Vercel (Recommandé)
+### Sur Vercel (exemple)
 
 1. **Installer Vercel CLI** :
 
@@ -275,18 +276,27 @@ Créer `frontend/vercel.json` :
 
 ## 8️⃣ Commandes Utiles
 
-### Déploiement Rapide
+### Déploiement Rapide depuis `app-rdv/`
 
 ```bash
-# Backend (depuis /backend)
+# Cloner le repo si nécessaire
+git clone https://github.com/bastien-at/app-rdv.git
+cd app-rdv
+
+# Backend (déploiement via Railway/Render configured sur GitHub)
 git add .
 git commit -m "Update backend"
 git push origin main
-# Railway/Render redéploie automatiquement
+# Railway/Render redéploie automatiquement selon la config du service
 
-# Frontend (depuis /frontend)
+# Frontend (exemple avec Vercel depuis /frontend)
+cd frontend
 vercel --prod
 ```
+
+> 💡 Pour certains PaaS (Railway, Fly.io, etc.), le fichier `nixpacks.toml` à la racine peut être utilisé
+> pour guider la configuration de build (Node.js, workspace, etc.). Référez-vous à la documentation de la
+> plateforme pour activer Nixpacks si nécessaire.
 
 ### Rollback
 
