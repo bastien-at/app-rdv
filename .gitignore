@@ -38,3 +38,7 @@ lerna-debug.log*
 # Database
 *.db
 *.sqlite
+
+# Node
+.cache
+.yarn

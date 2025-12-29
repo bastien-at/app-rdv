@@ -1,0 +1,13 @@
+generic-application:
+  nameOverride: full
+
+  workingDir: /var/www
+
+  labels:
+    app-type: web
+
+  serviceAccount:
+    name: alltricks-booking
+
+  test:
+    host: ""

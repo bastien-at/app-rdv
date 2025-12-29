@@ -1,0 +1,41 @@
+global:
+  env: prod
+  git:
+    commit: ""
+    branchSlug: ""
+    pullRequest:
+      id: ""
+
+full:
+  enabled: true
+  generic-application:
+    image:
+      repository: europe-west1-docker.pkg.dev/avanis-infra-gke/docker/alltricks-booking
+      tag: ${dockerChecksum}
+
+    env:
+      VITE_API_URL: https://booking.alltricks.fr/api/
+
+    replicas: 1
+
+#    resources:
+#      limits:
+#        cpu: 1000m
+#        memory: 1000Mi
+
+    ingress:
+      enabled: true
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-body-size: 50m
+        cert-manager.io/cluster-issuer: letsencrypt
+        cert-manager.io/duration: 2160h
+        cert-manager.io/renew-before: 240h
+        cert-manager.io/revision-history-limit: "10"
+      hosts:
+        - host: booking.alltricks.fr
+          paths:
+            - /
+      tls:
+        - secretName: certmanager-booking
+          hosts:
+            - booking.alltricks.fr
