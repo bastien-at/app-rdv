@@ -1,0 +1,180 @@
+processors:
+  - add_cloud_metadata: ~
+
+output.elasticsearch:
+  hosts: ['${ELASTICSEARCH_HOST:https://elasticsearch}:${ELASTICSEARCH_PORT:9200}']
+  username: '${ELASTICSEARCH_USERNAME:elastic}'
+  password: '${ELASTICSEARCH_PASSWORD:foo}'
+  ssl.verification_mode: none
+
+heartbeat.monitors:
+  - type: http
+    id: "at-prod-homepage"
+    name: "Alltricks Homepage"
+    urls:
+      - "https://www.alltricks.co.uk"
+      - "https://www.alltricks.com"
+      - "https://www.alltricks.de"
+      - "https://www.alltricks.es"
+      - "https://www.alltricks.fr"
+      - "https://www.alltricks.it"
+      - "https://www.alltricks.nl"
+      - "https://www.alltricks.pt"
+    check.request:
+      headers:
+        Cookie: ""
+    check.response.status: [ 200 ]
+    check.response.body: ["faa77ef5e0972e7c1ed9f38d5c8bd822"]
+    schedule: '@every 1m'
+    tags: ['at','prod','critical','tls']
+  - type: http
+    id: "at-prod-homepage-no-cache"
+    name: "Alltricks Homepage (no cache)"
+    urls:
+      - "https://www.alltricks.co.uk"
+      - "https://www.alltricks.com"
+      - "https://www.alltricks.de"
+      - "https://www.alltricks.es"
+      - "https://www.alltricks.fr"
+      - "https://www.alltricks.it"
+      - "https://www.alltricks.nl"
+      - "https://www.alltricks.pt"
+    check.request:
+      headers:
+        Cookie: foo=bar
+    check.response.status: [ 200 ]
+    check.response.body: ["faa77ef5e0972e7c1ed9f38d5c8bd822"]
+    schedule: '@every 1m'
+    tags: ['at','prod','critical','tls']
+  - type: http
+    id: "at-prod-cart"
+    name: "Alltricks Panier"
+    urls:
+      - "https://www.alltricks.co.uk/basket"
+      - "https://www.alltricks.com/basket"
+      - "https://www.alltricks.de/mein-warenkorb"
+      - "https://www.alltricks.es/cesta"
+      - "https://www.alltricks.fr/mon-panier"
+      - "https://www.alltricks.it/il-mio-carrello"
+      - "https://www.alltricks.nl/mijn-winkelwagen"
+      - "https://www.alltricks.pt/meu-carrinho"
+    check.response.status: [ 200 ]
+    schedule: '@every 1m'
+    tags: ['at','prod','critical']
+  - type: http
+    id: "at-prod-category-vtt"
+    name: "Alltricks Catégorie VTT"
+    urls:
+      - "https://www.alltricks.co.uk/C-40414-mtb"
+      - "https://www.alltricks.com/C-40414-mtb"
+      - "https://www.alltricks.de/C-40414-mtb"
+      - "https://www.alltricks.es/C-40414-mtb"
+      - "https://www.alltricks.fr/C-40414-vtt"
+      - "https://www.alltricks.it/C-40414-mtb"
+      - "https://www.alltricks.nl/C-40414-mountainbikes"
+      - "https://www.alltricks.pt/C-40414-mtb"
+    check.response.status: [ 200 ]
+    schedule: '@every 1m'
+    tags: ['at','prod','critical']
+  - type: http
+    id: "at-prod-contact"
+    name: "Alltricks Contact"
+    urls:
+      - "https://www.alltricks.co.uk/contact"
+      - "https://www.alltricks.com/contact"
+      - "https://www.alltricks.de/kontakt"
+      - "https://www.alltricks.es/contacto"
+      - "https://www.alltricks.fr/contact"
+      - "https://www.alltricks.it/contatto"
+      - "https://www.alltricks.nl/contact"
+      - "https://www.alltricks.pt/contato"
+    check.response.status: [ 200 ]
+    schedule: '@every 1m'
+    tags: ['at','prod','critical']
+  - type: http
+    id: "at-prod-login"
+    name: "Alltricks Login"
+    urls:
+      - "https://www.alltricks.co.uk/my-account"
+      - "https://www.alltricks.com/my-account"
+      - "https://www.alltricks.de/mein-konto"
+      - "https://www.alltricks.es/mi-cuenta"
+      - "https://www.alltricks.fr/mon-compte"
+      - "https://www.alltricks.it/il-mio-account"
+      - "https://www.alltricks.nl/mijn-profiel"
+      - "https://www.alltricks.pt/minha-conta"
+    check.response.status: [ 200 ]
+    schedule: '@every 1m'
+    tags: ['at','prod','critical']
+  - type: http
+    id: "elk-fleet-agents-degraded"
+    name: "ELK Agents dégradés"
+    urls:
+      - "https://logs.alltricks.sexy:5601/api/fleet/agents?page=1&perPage=20&kuery=(status%3Aerror%20or%20status%3Adegraded)"
+    username: '${ELASTICSEARCH_USERNAME:elastic}'
+    password: '${ELASTICSEARCH_PASSWORD:foo}'
+    check.response.status: [ 200 ]
+    check.response.json:
+      - description: check total
+        expression: 'total == 0'
+    schedule: '@every 1m'
+    tags: ['devops','elk']
+  - type: http
+    id: "at-prod-sparkow"
+    name: "Alltricks Sparkow FAPI"
+    urls:
+      - 'https://de-de-web-alltricks-frontapi-live.octipas-emerch.net'
+      - 'https://en-gb-web-alltricks-frontapi-live.octipas-emerch.net'
+      - 'https://es-es-web-alltricks-frontapi-live.octipas-emerch.net'
+      - 'https://fr-fr-web-alltricks-frontapi-live.octipas-emerch.net'
+      - 'https://it-it-web-alltricks-frontapi-live.octipas-emerch.net'
+      - 'https://nl-nl-web-alltricks-frontapi-live.octipas-emerch.net'
+    check.response.status: [ 200 ]
+    check.request.headers:
+      Accept-Encoding: 'gzip,deflate'
+    schedule: '@every 1m'
+    tags: ['at','prod','sparkow','critical']
+  - type: http
+    id: "tv-prod-homepage"
+    name: "Troc Velo Homepage"
+    urls:
+      - "https://www.troc-velo.com/fr-fr"
+    check.response.status: [ 200 ]
+    check.response.body: ["index, follow"]
+    schedule: '@every 1m'
+    tags: ['tv','prod','critical','tls']
+  - type: http
+    id: "tv-prod-contact"
+    name: "Troc Velo Contact"
+    urls:
+      - "https://www.troc-velo.com/fr-fr/contact"
+    check.response.status: [ 200 ]
+    schedule: '@every 1m'
+    tags: ['tv','prod','critical']
+  - type: http
+    id: "tv-prod-forum"
+    name: "Troc Velo Forum"
+    urls:
+      - "https://www.troc-velo.com/fr-fr/forum"
+    check.response.status: [ 200 ]
+    schedule: '@every 1m'
+    tags: ['tv','prod','critical']
+  - type: http
+    id: "tv-prod-connection"
+    name: "Troc Velo Connection"
+    urls:
+      - "https://www.troc-velo.com/fr-fr/connexion"
+    check.response.status: [ 200 ]
+    schedule: '@every 1m'
+    tags: ['tv','prod','critical']
+  # Check that proxy is not down (so 403 by default because ip si not authorized)
+  - type: http
+    id: "technique-proxy"
+    name: "Technique proxy"
+    urls:
+      - "https://technique.prod.k8s.alltricks.buzz/health.php"
+    check.response.status: [ 200 ]
+    check.response.body: ["Up"]
+    timeout: '2s'
+    schedule: '@every 1m'
+    tags: ['technique','prod']

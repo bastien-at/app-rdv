@@ -1,0 +1,31 @@
+nameOverride: ~
+fullnameOverride: ~
+
+replicaCount: 1
+
+image:
+  repository: nginx
+  tag: "1.27.3-alpine"
+  pullPolicy: IfNotPresent
+
+service:
+  type: LoadBalancer
+
+targets: {}
+# targets:
+#   mysql:
+#     port:
+#       source: 3306
+#       target: 3306
+#     envVarName: 'ENV_VAR_NAME_WITH_IP_OF_SERVICE'
+
+resources:
+  requests:
+    cpu: 10m
+    memory: 16Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}

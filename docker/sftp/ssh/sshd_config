@@ -1,0 +1,13 @@
+HostKey /etc/ssh/host_keys/ssh_host_rsa_key
+HostKey /etc/ssh/host_keys/ssh_host_dsa_key
+HostKey /etc/ssh/host_keys/ssh_host_ecdsa_key
+HostKey /etc/ssh/host_keys/ssh_host_ed25519_key
+
+UseDNS no
+PermitRootLogin no
+X11Forwarding no
+AllowTcpForwarding no
+X11Forwarding no
+PubkeyAuthentication yes
+PermitEmptyPasswords no
+Subsystem sftp /usr/lib/openssh/sftp-server

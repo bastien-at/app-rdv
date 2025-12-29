@@ -1,0 +1,32 @@
+configs:
+  coverage:
+    content: |
+      server {
+        listen 80 default_server;
+        server_name _;
+
+        root /var/lib/jenkins/jobs;
+
+        gzip_static on;
+
+        location ~* ^/job/(?<job>[^/]+)/(?<build>[0-9]+)/clover-report/(?<path>.*/)?$$ {
+          rewrite ^(.*)$ /$$job/builds/$$build/$$path/index.html last;
+        }
+
+        location ~* ^/job/(?<job>[^/]+)/(?<build>[0-9]+)/clover-report/(?<path>.+)$$ {
+          rewrite ^(.*)$ /$$job/builds/$$build/$$path last;
+        }
+      }
+
+services:
+  nginx:
+    image: nginx:1.29.3-alpine-slim
+    ports:
+      - 8081:80
+    volumes:
+      - '/var/lib/jenkins/jobs/dev-pull-request-ci/builds:/var/lib/jenkins/jobs/dev-pull-request-ci/builds:ro'
+      - '/var/lib/jenkins/jobs/system-jenkins-dev-worker-avanis-apps-update-boot-image/builds:/var/lib/jenkins/jobs/system-jenkins-dev-worker-avanis-apps-update-boot-image/builds:ro'
+    configs:
+      - source: coverage
+        target: "/etc/nginx/conf.d/01-coverage.conf"
+    restart: always

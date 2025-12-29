@@ -1,0 +1,13 @@
+#!/bin/bash
+set -e
+
+/etc/init.d/docker-auto-update-hosts start
+
+cleanup() {
+  /etc/init.d/docker-auto-update-hosts stop
+}
+
+# Background process to force docker to not stop the container
+trap 'cleanup && exit 0' SIGTERM
+touch /tmp/docker-auto-update-hosts.log
+tail -f /tmp/docker-auto-update-hosts.log & wait ${!}

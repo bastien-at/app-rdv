@@ -1,0 +1,12 @@
+apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshotContent
+metadata:
+  name: {{ template "fullname" . }}-{{ .Values.namespace }}
+spec:
+  deletionPolicy: Retain
+  driver: pd.csi.storage.gke.io
+  source:
+    snapshotHandle: {{ .Values.snapshot.name }}
+  volumeSnapshotRef:
+    name: {{ template "fullname" . }}
+    namespace: {{ .Values.namespace }}

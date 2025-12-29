@@ -1,0 +1,22 @@
+###########################################
+# Don't add ignore about a "project" here #
+# Use "project" .gitignore instead        #
+###########################################
+
+# Mac files
+.DS_Store
+# Windows files
+desktop.ini
+# Idea files
+.idea/
+# Netbeans files
+nbproject/
+# VSCode files
+.vscode
+# Emacs files
+*~
+# JS dependencies
+node_modules
+
+.env
+grafana/.env

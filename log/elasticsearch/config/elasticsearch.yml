@@ -1,0 +1,29 @@
+---
+## Default Elasticsearch configuration from Elasticsearch base image.
+## https://github.com/elastic/elasticsearch/blob/main/distribution/docker/src/docker/config/elasticsearch.yml
+#
+cluster.name: docker-cluster
+network.host: 0.0.0.0
+
+## X-Pack settings
+## see https://www.elastic.co/guide/en/elasticsearch/reference/current/security-settings.html
+#
+xpack.license.self_generated.type: basic
+xpack.security.enabled: true
+
+## SSL/TLS
+#
+xpack.security.http.ssl.enabled: true
+xpack.security.http.ssl.key: /usr/share/elasticsearch/config/certs/ca/live/logs.alltricks.sexy/privkey.pem
+xpack.security.http.ssl.certificate: /usr/share/elasticsearch/config/certs/ca/live/logs.alltricks.sexy/fullchain.pem
+xpack.security.http.ssl.verification_mode: certificate
+
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.key: /usr/share/elasticsearch/config/certs/ca/live/logs.alltricks.sexy/privkey.pem
+xpack.security.transport.ssl.certificate: /usr/share/elasticsearch/config/certs/ca/live/logs.alltricks.sexy/fullchain.pem
+xpack.security.transport.ssl.verification_mode: certificate
+
+## Snapshots
+path:
+  repo:
+    - /usr/share/elasticsearch/snapshots

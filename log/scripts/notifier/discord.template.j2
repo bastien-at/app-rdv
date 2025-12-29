@@ -1,0 +1,67 @@
+{%- set alertname = payload.get("labels", {}).get("alertname") %}
+{%- set rulename = payload.get("labels", {}).get("rulename", alertname) %}
+{%- set group = [] %}
+{%- set grouplabels = payload.get("labels", {}).get("alert_group", "no").split(',') %}
+{%- for grouplabel in grouplabels -%}
+  {{ group.append(payload.get("labels", {}).get(grouplabel, "no")) or "" }}
+{%- endfor %}
+{%- set group = group|join(' - ') %}
+{%- set reason = payload.get("annotations", {}).get("grafana_state_reason", "") %}
+{%- set description = payload.get("annotations", {}).get("description", "seuil franchi") %}
+{%- set error = payload.get("annotations", {}).get("Error", "") %}
+{%- if alertname == "DatasourceNoData" or reason == "NoData" %}
+  {%- set finalreason = 'Aucune donnée' %}
+{%- elif alertname == "DatasourceError" or reason == "Error" %}
+  {%- set finalreason = 'Erreur d’exécution de la règle (' + error + ')' %}
+{%- elif description != "-" %}
+  {%- set finalreason = description %}
+  {%- if reason == "MissingSeries" %}
+    {%- set finalreason = finalreason + ' (plus de donnée sur la série)' %}
+  {%- elif reason == "Updated" %}
+    {%- set finalreason = finalreason + ' (règle mise à jour)' %}
+  {%- endif %}
+{%- elif reason == "Updated" %}
+  {%- set finalreason = 'Règle mise à jour' %}
+{%- elif reason == "MissingSeries" %}
+  {%- set finalreason = 'Plus de donnée sur la série' %}
+{%- endif %}
+{%- if payload.annotations.URL %}
+  {%- set _ = payload.annotations.__setitem__('URL', payload.annotations.URL|replace("(","%28")|replace(")","%29")) -%}
+{%- endif %}
+{%- if payload.get("labels", {}).get("critical", "") %}
+  {%- set critical = true %}
+{%- else %}
+  {%- set critical = false %}
+{%- endif %}
+{
+  "content": {% if critical and ping and not alert_group_resolved and not alert_group_acknowledged %}"Ping <@&{{ ping }}>"{% else %}null{% endif %},
+  "embeds": [
+    {
+      "title": null,
+      "description": "{%- if critical %}:warning: :warning: :warning: :warning: :warning: **CRITIQUE** :warning: :warning: :warning: :warning: :warning:\n\n{%- endif %}*[Incident #{{ alert_group_id }}](http://logs.alltricks.sexy:3000/a/grafana-oncall-app/alert-groups/{{ alert_group_id }}) {% if alert_group_resolved %}fermé{% elif alert_group_acknowledged %}pris en charge{% else %}ouvert{% endif %}*",
+      "url": "http://logs.alltricks.sexy:3000/a/grafana-oncall-app/alert-groups/{{ alert_group_id }}",
+      "color": {%- if alert_group_resolved %}1609491{%- elif alert_group_acknowledged %}9403155{% else %}11337728{% endif %},
+      "fields": [
+        {
+          "name": "Groupe",
+          "value": "{{ payload.labels.grafana_folder }}",
+          "inline": true
+        },
+        {
+          "name": "Règle",
+          "value": "{{ rulename }}",
+          "inline": true
+        },
+        {
+          "name": "Cible",
+          "value": {%- if payload.annotations.URL %}{%- if payload.annotations.URL|length > 150 %}{{ ["[",payload.annotations.URL[0:150]|replace("://",":// "),"...](",payload.annotations.URL,")"]|join|tojson_pretty }}{% else %}{{ payload.annotations.URL|tojson_pretty }}{% endif %}{% elif group != "no" %}{{ group|tojson_pretty }}{% else %}" - "{% endif %}
+        }{%- if finalreason %},
+        {
+          "name": "Motif",
+          "value": {{ finalreason|tojson_pretty }}
+        }{%- endif %}
+      ]
+    }
+  ],
+  "attachments": []
+}

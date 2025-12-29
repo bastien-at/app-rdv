@@ -1,0 +1,119 @@
+elastic-agent:
+  web:
+    resources:
+      limits:
+        cpu: 2
+        memory: 1200Mi
+      requests:
+        cpu: 0.2
+        memory: 300Mi
+    tolerations:
+      - key: pool
+        operator: Equal
+        value: spot-pool
+        effect: NoSchedule
+      - key: pool
+        operator: Equal
+        value: spot-pool-n1-highcpu-8
+        effect: NoSchedule
+      - key: pool
+        operator: Equal
+        value: regular-pool-c4d-standard-8
+        effect: NoSchedule
+      - key: pool
+        operator: Equal
+        value: spot-pool-c4d-highcpu-8
+        effect: NoSchedule
+      - key: pool
+        operator: Equal
+        value: spot-pool-c4d-highcpu-4
+        effect: NoSchedule
+  jobs:
+    resources:
+      limits:
+        cpu: 3
+        memory: 2000Mi
+      requests:
+        cpu: 0.2
+        memory: 300Mi
+    tolerations:
+      - effect: NoSchedule
+        key: jobs
+        operator: Equal
+        value: e2-standard-8
+      - effect: NoSchedule
+        key: jobs
+        operator: Equal
+        value: e2-highmem-4
+      - effect: NoSchedule
+        key: pool
+        operator: Equal
+        value: spot-pool-n1-highcpu-16
+      - effect: NoSchedule
+        key: pool
+        operator: Equal
+        value: jobs-regular-pool-c4d-standard-8
+      - effect: NoSchedule
+        key: pool
+        operator: Equal
+        value: jobs-regular-pool-c4d-highmem-4
+      - effect: NoSchedule
+        key: pool
+        operator: Equal
+        value: spot-pool-c4d-highcpu-16
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: node_pool
+                  operator: In
+                  values:
+                    - jobs-e2-highmem-4
+                    - jobs-e2-standard-8
+                    - spot-pool-n1-highcpu-16
+                    - jobs-regular-pool-c4d-standard-8
+                    - jobs-regular-pool-c4d-highmem-4
+                    - spot-pool-c4d-highcpu-16
+  ksm:
+    resources:
+      limits:
+        cpu: 2
+        memory: 1000Mi
+      requests:
+        cpu: 0.2
+        memory: 300Mi
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+
+  rum:
+    enabled: true
+    ingress:
+      className: "nginx"
+      annotations:
+        # Ssl certificates
+        cert-manager.io/cluster-issuer: letsencrypt
+        cert-manager.io/duration: 2160h
+        cert-manager.io/renew-before: 240h
+        cert-manager.io/revision-history-limit: "10"
+      whitelistSourceRanges:
+        # Bureaux de Montigny
+        - 83.118.207.126/32
+        # Bureaux de BBA
+        - 90.85.178.3/32
+        # Bureaux Paris
+        - 92.168.105.189/32
+        # VPN
+        - 62.210.24.239/32 # Todo : Delete when VPN is migrated
+        - 62.4.14.164/32
+      hosts:
+        - host: rum.alltricks.com
+          paths:
+            - /
+      tls:
+        - secretName: certmanager-rum
+          hosts:
+            - rum.alltricks.com
