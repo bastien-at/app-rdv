@@ -1,0 +1,63 @@
+elastic-agent:
+  web:
+    resources:
+      limits:
+        cpu: 2
+        memory: 1200Mi
+      requests:
+        cpu: 0.2
+        memory: 300Mi
+    tolerations:
+      - key: pool
+        operator: Equal
+        value: spot-pool-c4d-standard-4
+        effect: NoSchedule
+      - key: pool
+        operator: Equal
+        value: spot-pool-c4d-highcpu-4
+        effect: NoSchedule
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: node_pool
+                  operator: In
+                  values:
+                    - spot-pool-c4d-standard-4
+                    - spot-pool-c4d-highcpu-4
+  jobs:
+    resources:
+      limits:
+        cpu: 2
+        memory: 1000Mi
+      requests:
+        cpu: 0.2
+        memory: 300Mi
+    tolerations:
+      - key: pool
+        operator: Equal
+        value: regular-pool-e2-standard-4
+        effect: NoSchedule
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: node_pool
+                  operator: In
+                  values:
+                    - regular-pool-e2-standard-4
+  ksm:
+    resources:
+      limits:
+        cpu: 2
+        memory: 1000Mi
+      requests:
+        cpu: 0.2
+        memory: 300Mi
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule

@@ -1,0 +1,62 @@
+{{- if .Values.rum.enabled -}}
+
+{{- if and .Values.rum.ingress.className (not (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion)) }}
+  {{- if not (hasKey .Values.rum.ingress.annotations "kubernetes.io/ingress.class") }}
+  {{- $_ := set .Values.rum.ingress.annotations "kubernetes.io/ingress.class" .Values.rum.ingress.className }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.rum.ingress.certManager }}
+  {{- $_ := set .Values.rum.ingress.annotations "kubernetes.io/tls-acme" "true" }}
+{{- end }}
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "elastic-agent.name" . }}-real-user-monitoring
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: elastic-agent-real-user-monitoring
+    {{- include "elastic-agent.labels" . | nindent 4 }}
+  {{- if or (.Values.rum.ingress.annotations) (.Values.rum.ingress.whitelistSourceRanges) (.Values.rum.ingress.denylistSourceRanges) }}
+  annotations:
+    {{- with .Values.rum.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if .Values.rum.ingress.whitelistSourceRanges }}
+    nginx.ingress.kubernetes.io/whitelist-source-range: {{ join "," .Values.rum.ingress.whitelistSourceRanges }}
+    {{- end }}
+    {{- if .Values.rum.ingress.denylistSourceRanges }}
+    nginx.ingress.kubernetes.io/denylist-source-range: {{ join "," .Values.rum.ingress.denylistSourceRanges }}
+    {{- end }}
+  {{- end }}
+spec:
+  {{- if and .Values.rum.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
+  ingressClassName: {{ .Values.rum.ingress.className }}
+  {{- end }}
+  {{- if .Values.rum.ingress.tls }}
+  tls:
+    {{- range .Values.rum.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  rules:
+    {{- range .Values.rum.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ . }}
+            pathType: Prefix
+            backend:
+              service:
+                name: elastic-agent-real-user-monitoring
+                port:
+                  number: {{ $.Values.rum.service.ports.agent }}
+          {{- end }}
+    {{- end }}
+  {{- end }}

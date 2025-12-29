@@ -1,0 +1,129 @@
+# Default values for images.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+replicaCount: 1
+
+image:
+  repository: darthsim/imgproxy
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: "v3.20.0"
+  resources: {}
+
+proxy:
+  repository: nginx
+  pullPolicy: IfNotPresent
+  tag: "1.27.3-alpine"
+  resources: {}
+  env:
+    UPSTREAM: 127.0.0.1:8080
+    NGINX_ENVSUBST_OUTPUT_DIR: "/tmp/conf.d"
+    ACCESS_LOG_FILE: /var/log/nginx/access.log
+    ERROR_LOG_FILE: /var/log/nginx/error.log
+    PRIVATE_KEY: 2cf1e5a50ac714b81de25d4c3de43246
+    PUBLIC_PRESETS: foo
+    PUBLIC_PRESETS_IMAGE_SUFFIX: ''
+    PRIVATE_PRESETS: bar
+    PATH_PRESETS_0_PRESET: customize_path_preset_if_needed_preset_13174803535921259005924488389578
+    PATH_PRESETS_0_PATH: customize_path_preset_if_needed_path_13174803535921259005924488389578
+    PATH_PRESETS_1_PRESET: customize_path_preset_if_needed_preset_13174803535921259005924488389578
+    PATH_PRESETS_1_PATH: customize_path_preset_if_needed_path_13174803535921259005924488389578
+    PATH_PRESETS_2_PRESET: customize_path_preset_if_needed_preset_13174803535921259005924488389578
+    PATH_PRESETS_2_PATH: customize_path_preset_if_needed_path_13174803535921259005924488389578
+    PATH_PRESETS_3_PRESET: customize_path_preset_if_needed_preset_13174803535921259005924488389578
+    PATH_PRESETS_3_PATH: customize_path_preset_if_needed_path_13174803535921259005924488389578
+    PATH_PRESETS_4_PRESET: customize_path_preset_if_needed_preset_13174803535921259005924488389578
+    PATH_PRESETS_4_PATH: customize_path_preset_if_needed_path_13174803535921259005924488389578
+    PATH_PRESETS_5_PRESET: customize_path_preset_if_needed_preset_13174803535921259005924488389578
+    PATH_PRESETS_5_PATH: customize_path_preset_if_needed_path_13174803535921259005924488389578
+    PATH_PRESETS_6_PRESET: customize_path_preset_if_needed_preset_13174803535921259005924488389578
+    PATH_PRESETS_6_PATH: customize_path_preset_if_needed_path_13174803535921259005924488389578
+    PATH_PRESETS_7_PRESET: customize_path_preset_if_needed_preset_13174803535921259005924488389578
+    PATH_PRESETS_7_PATH: customize_path_preset_if_needed_path_13174803535921259005924488389578
+    PATH_PRESETS_8_PRESET: customize_path_preset_if_needed_preset_13174803535921259005924488389578
+    PATH_PRESETS_8_PATH: customize_path_preset_if_needed_path_13174803535921259005924488389578
+    PATH_PRESETS_9_PRESET: customize_path_preset_if_needed_preset_13174803535921259005924488389578
+    PATH_PRESETS_9_PATH: customize_path_preset_if_needed_path_13174803535921259005924488389578
+
+env:
+  IMGPROXY_ONLY_PRESETS: false
+  IMGPROXY_LOG_LEVEL: warn
+  IMGPROXY_LOG_FORMAT: json
+
+cdn:
+  cachePolicy:
+    includeHost: true
+    includeProtocol: false
+  cacheMode: CACHE_ALL_STATIC
+  clientTtl: 7776000
+  defaultTtl: 15552000
+  maxTtl: 15552000
+  negativeCaching: true
+  requestCoalescing: true
+  serveWhileStale: 86400
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: false
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  type: ClusterIP
+  annotations:
+    cloud.google.com/backend-config: '{"default": "images"}'
+    cloud.google.com/neg: '{"ingress": true}'
+  port: 80
+  imgproxyPort: 8080
+
+ingress:
+  enabled: true
+  className: "gce"
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: "ingress-gce-images"
+    networking.gke.io/managed-certificates: "images"
+    networking.gke.io/v1beta1.FrontendConfig: "images"
+
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  # targetCPUType: Utilization
+  targetCPUPercentage: 80
+  # targetMemoryType: Utilization
+  # targetMemoryPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# Shared config files (cf. README.md)
+# global:
+#  configFiles:
+#    key:
+#      localPath: config_files/localPath.txt
+#      mountPath: /etc/app/mountPath.txt
+#      subPath: subPath

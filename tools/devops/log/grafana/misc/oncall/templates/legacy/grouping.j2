@@ -1,0 +1,17 @@
+{%- set alertname = payload.get("labels", {}).get("alertname") %}
+{%- set rulename = payload.get("labels", {}).get("rulename", alertname) %}
+{%- set group = [] %}
+{%- set grouplabels = payload.get("labels", {}).get("alert_group", "no").split(',') %}
+{%- for grouplabel in grouplabels -%}
+  {{ group.append(payload.get("labels", {}).get(grouplabel, "no")) or "" }}
+{%- endfor %}
+{%- set group = group|join(' - ') %}
+{%- set noautoclose = payload.get("labels", {}).get("no_auto_close", "no") %}
+{{- payload.get("labels", {}).get("grafana_folder") }}|
+{{ rulename }}|
+{%- if group != "no" %}
+{{- group }}|
+{%- endif %}
+{%- if alertname == "DatasourceNoData" or alertname == "DatasourceError" or noautoclose != "no" %}
+{{- payload.fingerprint }}|{{- payload.startsAt }}|
+{%- endif %}

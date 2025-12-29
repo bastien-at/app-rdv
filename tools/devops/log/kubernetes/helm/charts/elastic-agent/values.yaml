@@ -1,0 +1,86 @@
+# Default values for elastic-agent.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+namespace: "${K8S_NAMESPACE}"
+
+image:
+  repository: "docker.elastic.co/elastic-agent/elastic-agent"
+  pullPolicy: IfNotPresent
+  tag: "${ELASTIC_VERSION}"
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+env:
+  FLEET_ENROLL: "1"
+  FLEET_INSECURE: "false"
+  FLEET_URL: "${FLEET_URL}"
+  KIBANA_HOST: "${KIBANA_HOST}"
+  KIBANA_FLEET_USERNAME: "elastic"
+  KIBANA_FLEET_PASSWORD: "${ELASTIC_PASSWORD}"
+  ELASTIC_NETINFO: "false"
+
+nameOverride: ""
+fullnameOverride: ""
+
+securityContext:
+  runAsUser: 0
+  # The following capabilities are needed for Universal Profiling.
+  # More fine graded capabilities are only available for newer Linux kernels.
+  # If you are using the Universal Profiling integration, please uncomment these lines before applying.
+  #procMount: "Unmasked"
+  #privileged: true
+  #capabilities:
+  #  add:
+  #    - SYS_ADMIN
+
+web:
+  resources: {}
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/master
+      effect: NoSchedule
+  affinity: {}
+jobs:
+  resources: {}
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/master
+      effect: NoSchedule
+  affinity: {}
+ksm:
+  resources: {}
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/master
+      effect: NoSchedule
+  affinity: {}
+rum:
+  enabled: false
+  ingress:
+    className: "nginx"
+    certManager: false
+    hosts: []
+    annotations: []
+    tls: []
+  service:
+    type: ClusterIP
+    ports:
+      agent: 80
+  container:
+    ports:
+      agent: 8222
+  resources: {}
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      effect: NoSchedule
+    - key: node-role.kubernetes.io/master
+      effect: NoSchedule
+  affinity: {}
+nodeSelector: {}

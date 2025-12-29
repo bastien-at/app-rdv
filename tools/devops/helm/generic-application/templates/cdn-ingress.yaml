@@ -1,0 +1,72 @@
+{{- if and .Values.cdn.enabled .Values.cdn.ingress.enabled -}}
+{{- $fullName := include "fullname" . -}}
+{{- $svcPort := .Values.cdn.service.ports.http -}}
+
+{{- if and .Values.cdn.ingress.staticIpName (not (hasKey .Values.cdn.ingress.annotations "kubernetes.io/ingress.global-static-ip-name")) }}
+  {{- $_ := set .Values.cdn.ingress.annotations "kubernetes.io/ingress.global-static-ip-name" .Values.cdn.ingress.staticIpName}}
+{{- end }}
+
+{{- if and .Values.cdn.ingress.className (not (hasKey .Values.cdn.ingress.annotations "kubernetes.io/ingress.class")) }}
+  {{- $_ := set .Values.cdn.ingress.annotations "kubernetes.io/ingress.class" .Values.cdn.ingress.className}}
+{{- end }}
+
+{{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1
+{{- else if semverCompare ">=1.14-0" .Capabilities.KubeVersion.GitVersion -}}
+apiVersion: networking.k8s.io/v1beta1
+{{- else -}}
+apiVersion: extensions/v1beta1
+{{- end }}
+kind: Ingress
+metadata:
+  name: {{ $fullName }}-cdn
+  labels:
+    app: {{ template "name" . }}
+    {{- include "labels" . | nindent 4 }}
+  annotations:
+    networking.gke.io/v1beta1.FrontendConfig: "{{ $fullName }}-cdn"
+  {{- with .Values.cdn.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- if and .Values.cdn.ingress.className (semverCompare ">=1.18-0" .Capabilities.KubeVersion.GitVersion) }}
+  ingressClassName: {{ .Values.cdn.ingress.className }}
+  {{- end }}
+  {{- if .Values.cdn.ingress.tls }}
+  tls:
+    {{- range .Values.cdn.ingress.tls }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+  defaultBackend:
+    service:
+      name: {{ $fullName }}-cdn
+      port:
+        number: {{ $svcPort }}
+  rules:
+    {{- range .Values.cdn.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            {{- if and .pathType (semverCompare ">=1.18-0" $.Capabilities.KubeVersion.GitVersion) }}
+            pathType: {{ .pathType }}
+            {{- end }}
+            backend:
+              {{- if semverCompare ">=1.19-0" $.Capabilities.KubeVersion.GitVersion }}
+              service:
+                name: {{ .backendServiceName | default (print $fullName (.backendServiceNameSuffix | default "-cdn")) }}
+                port:
+                  number: {{ .backendServicePort | default $svcPort }}
+              {{- else }}
+              serviceName: {{ .backendServiceName | default (print $fullName (.backendServiceNameSuffix | default "-cdn")) }}
+              servicePort: {{ .backendServicePort | default $svcPort }}
+              {{- end }}
+          {{- end }}
+    {{- end }}
+{{- end }}

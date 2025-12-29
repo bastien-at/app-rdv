@@ -1,0 +1,58 @@
+{{- if .Values.cdn.enabled -}}
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: {{ template "fullname" . }}-cdn
+  labels:
+    app: {{ template "name" . }}
+    {{- include "labels" . | nindent 4 }}
+spec:
+  {{- if .Values.cdn.backendConfig.healthCheck }}
+  healthCheck:
+    checkIntervalSec: 10
+    timeoutSec: 10
+    healthyThreshold: 2
+    unhealthyThreshold: 3
+    type: HTTP
+    # Keep it but currently host property is not supported by gke (https://cloud.google.com/kubernetes-engine/docs/how-to/ingress-configuration?hl=fr#direct_health)
+    # host: {{ .Values.cdn.backendConfig.healthCheck.host }}
+    requestPath: {{ .Values.cdn.backendConfig.healthCheck.path }}
+    port: {{ .Values.cdn.backendConfig.healthCheck.port }}
+  {{- end }}
+  {{- if .Values.cdn.backendConfig.customRequestHeaders }}
+  customRequestHeaders:
+    {{- toYaml .Values.cdn.backendConfig.customRequestHeaders | nindent 4 }}
+  {{- end }}
+  {{- if .Values.cdn.backendConfig.customResponseHeaders }}
+  customResponseHeaders:
+    {{- toYaml .Values.cdn.backendConfig.customResponseHeaders | nindent 4 }}
+  {{- end }}
+  cdn:
+    enabled: true
+    {{- toYaml .Values.cdn.backendConfig.cdn | nindent 4 }}
+---
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: {{ template "fullname" . }}-cdn
+  labels:
+    app: {{ template "name" . }}
+    {{- include "labels" . | nindent 4 }}
+spec:
+  redirectToHttps:
+    enabled: true
+    responseCodeName: MOVED_PERMANENTLY_DEFAULT
+{{- if .Values.cdn.ingress.hostname }}
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: {{ template "fullname" . }}-cdn
+  labels:
+    app: {{ template "name" . }}
+    {{- include "labels" . | nindent 4 }}
+spec:
+  domains:
+    - {{ .Values.cdn.ingress.hostname | quote }}
+{{- end }}
+{{- end }}

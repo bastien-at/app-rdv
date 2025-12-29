@@ -1,0 +1,167 @@
+providers:
+  # Docker configuration backend
+  docker:
+    # Need to use traefik.enable=true label to expose a container to traefik
+    exposedByDefault: false
+    constraints: "Label(`avanis_app`,`__avanis_app__`) || Label(`alltricks_app`,`__avanis_app__`)"
+  file:
+    directory: /etc/traefik/dynamic
+
+api:
+  insecure: true
+
+entryPoints:
+  # Httpd - Nginx
+  "80":
+    address: ":80"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+  "443":
+    address: ":443"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+  "8080":
+    address: ":8080"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+
+  # Nodejs
+  "3000":
+    address: ":3000"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+  "3001":
+    address: ":3001"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+  "3002":
+    address: ":3002"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+  "8001":
+    address: ":8001"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+
+  # Vite server
+  "5170":
+    address: ":5170"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+  "5171":
+    address: ":5171"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+  "5172":
+    address: ":5172"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+  "5173":
+    address: ":5173"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+
+  # Storybook
+  "6000":
+    address: ":6000"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+  "6001":
+    address: ":6001"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+  "6002":
+    address: ":6002"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+  "6006":
+    address: ":6006"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+
+  #
+  "7000":
+    address: ":7000"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+  "7001":
+    address: ":7001"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+  "7002":
+    address: ":7002"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+
+  # Elastic
+  "8220":
+    address: ":8220"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+  "8221":
+    address: ":8221"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+  "8222":
+    address: ":8222"
+    transport:
+      respondingTimeouts:
+        readTimeout: "0"
+        idleTimeout: "0"
+
+  # Traefik
+  traefik:
+    address: ":9000"
+
+http:
+  routers:
+    api:
+      rule: PathPrefix(`/api`) || PathPrefix(`/dashboard`)
+      entrypoints:
+        - traefik
+      service: api@internal
+
+tls:
+  stores:
+    default:
+      defaultCertificate: ~
