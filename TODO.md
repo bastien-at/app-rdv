@@ -13,3 +13,4 @@
 [ ] Check tls via jenkins prod
 [ ] Monitoring ? 
 [ ] CHanger port 80 frontend et ne plus lancer en root
+[ ] Ratelimiter dans le server.ts backend
