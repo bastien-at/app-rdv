@@ -10,7 +10,7 @@ full:
   enabled: true
   generic-application:
     image:
-      repository: europe-west1-docker.pkg.dev/avanis-infra-gke/docker/alltricks-booking
+      repository: europe-west1-docker.pkg.dev/avanis-infra-gke/docker/booking
       tag: ${dockerChecksum}
 
     env:

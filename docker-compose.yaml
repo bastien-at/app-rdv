@@ -9,6 +9,7 @@ services:
       GROUP_ID: "${GROUP_ID}"
       PHYSICAL_ENV: 'dev'
       VITE_API_URL: http://booking.alltricks.fr.local/api/
+      AUTOSTART_APPS: false
     volumes:
       - ./:/var/www
       - ./devops/supervisor/srv_backend.conf:/etc/supervisor/conf.d/srv_backend.conf:ro

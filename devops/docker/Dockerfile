@@ -7,9 +7,8 @@ COPY ./*.json /var/www/
 COPY ./devops/supervisor/* /etc/supervisor/conf.d/
 
 RUN rm /etc/supervisor/conf.d/srv_nginx.conf; \
-    npm install; \
-    chown -R www-data:www-data /var/www;
+    cd /var/www && npm install;
 
-USER root
+ENV AUTOSTART_APPS=true
 
 ENTRYPOINT ["docker-entrypoint"]

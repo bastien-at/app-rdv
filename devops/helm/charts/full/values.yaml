@@ -7,7 +7,8 @@ generic-application:
     app-type: web
 
   serviceAccount:
-    name: alltricks-booking
+    name: booking
+    create: true
 
   test:
     host: ""
