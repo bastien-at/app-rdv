@@ -218,6 +218,8 @@ export default function ModernBookingPage() {
     const sourceParam = searchParams.get('source');
     const sourceVal = sourceParam || (isAdmin ? 'admin' : undefined);
     
+    console.log('DEBUG: sourceParam=', sourceParam, 'isAdmin=', isAdmin, 'sourceVal=', sourceVal);
+    
     try {
       const bookingData: CreateBookingData = {
         store_id: store.id,
@@ -228,7 +230,7 @@ export default function ModernBookingPage() {
         customer_lastname: formData.lastname,
         customer_email: formData.email,
         customer_phone: formData.phone,
-        status: sourceVal === 'admin' ? 'confirmed' : 'pending',
+        status: (sourceVal === 'admin') ? 'confirmed' : 'pending',
         source: sourceVal || undefined,
         customer_data: {
           height: formData.height ? parseInt(formData.height) : undefined,
@@ -502,10 +504,11 @@ export default function ModernBookingPage() {
                             return (
                               <button
                                 key={i}
-                                onClick={() => handleSlotSelect(slot)}
+                                onClick={() => !isBooked && handleSlotSelect(slot)}
+                                disabled={isBooked}
                                 className={`py-1.5 px-1 rounded-md text-xs font-medium transition-all
                                   ${isBooked
-                                    ? 'bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100'
+                                    ? 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed opacity-60'
                                     : selectedSlot === slot
                                       ? 'bg-[#005162] text-white shadow-sm'
                                       : 'bg-white border border-gray-200 text-gray-700 hover:border-[#005162] hover:text-[#005162]'
