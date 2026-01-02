@@ -38,6 +38,8 @@ import { getAdminToken, adminConfirmBooking } from '../../services/api';
 interface Store {
   id: string;
   name: string;
+  workshop_capacity?: number;
+  fitting_capacity?: number;
 }
 
 interface Booking {
@@ -404,34 +406,56 @@ export default function PlanningPage() {
       new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime()
     );
 
-    const groups: Booking[][] = [];
+    const columns: Booking[][] = []; // Represents visual columns within the day column
     sorted.forEach(booking => {
       let placed = false;
-      for (const group of groups) {
-        const isConcurrent = group.some(b => {
-          const aStart = new Date(booking.start_datetime).getTime();
-          const aEnd = new Date(booking.end_datetime).getTime();
-          const bStart = new Date(b.start_datetime).getTime();
-          const bEnd = new Date(b.end_datetime).getTime();
-          return aStart < bEnd && aEnd > bStart;
-        });
-
-        if (isConcurrent) {
-          group.push(booking);
+      for (let i = 0; i < columns.length; i++) {
+        const lastInColumn = columns[i][columns[i].length - 1];
+        const lastEnd = new Date(lastInColumn.end_datetime).getTime();
+        const currentStart = new Date(booking.start_datetime).getTime();
+        
+        // If this booking starts after the last one in this column ends, it can go here
+        if (currentStart >= lastEnd) {
+          columns[i].push(booking);
           placed = true;
           break;
         }
       }
-      if (!placed) groups.push([booking]);
+      if (!placed) columns.push([booking]);
     });
 
+    // For each booking, find how many total columns are needed during its duration
+    // to calculate the correct width and offset
     return dayBookings.map(b => {
-      const group = groups.find(g => g.includes(b)) || [b];
-      const indexInGroup = group.indexOf(b);
+      const bStart = new Date(b.start_datetime).getTime();
+      const bEnd = new Date(b.end_datetime).getTime();
+      
+      const columnIndex = columns.findIndex(col => col.includes(b));
+      
+      // Overlap detection: find all bookings that overlap with this one
+      const overlappingBookings = dayBookings.filter(other => {
+        const otherStart = new Date(other.start_datetime).getTime();
+        const otherEnd = new Date(other.end_datetime).getTime();
+        return bStart < otherEnd && bEnd > otherStart;
+      });
+
+      // Max columns needed during this booking's interval
+      // We calculate the maximum number of concurrent bookings at any single point in time
+      // within this booking's duration.
+      let maxConcurrentAtAnyPoint = 0;
+      // Simple heuristic: count how many visual columns are active during this booking
+      const activeColumns = columns.filter(col => 
+        col.some(other => {
+          const otherStart = new Date(other.start_datetime).getTime();
+          const otherEnd = new Date(other.end_datetime).getTime();
+          return bStart < otherEnd && bEnd > otherStart;
+        })
+      ).length;
+
       return {
         ...b,
-        concurrent_count: group.length,
-        concurrent_index: indexInGroup
+        concurrent_count: Math.max(activeColumns, 1),
+        concurrent_index: columnIndex
       };
     });
   };
@@ -680,6 +704,56 @@ export default function PlanningPage() {
 
       return false;
     });
+  };
+
+  const getCapacityForSlot = (day: Date, hour: number, minutes: number): number => {
+    if (!selectedStore) return 1;
+    const store = stores.find(s => s.id === selectedStore);
+    if (!store) return 1;
+
+    if (activeTab === 'fitting') return store.fitting_capacity || 1;
+    if (activeTab === 'workshop') return store.workshop_capacity || 1;
+    
+    return Math.max(store.fitting_capacity || 1, store.workshop_capacity || 1);
+  };
+
+  const getBookedCountForSlot = (day: Date, hour: number, minutes: number): number => {
+    const slotStart = new Date(day);
+    slotStart.setHours(hour, minutes, 0, 0);
+    const slotEnd = new Date(slotStart);
+    slotEnd.setMinutes(slotEnd.getMinutes() + 15);
+
+    return bookings.filter(b => {
+      if (b.status === 'cancelled') return false;
+      const bStart = new Date(b.start_datetime);
+      const bEnd = new Date(b.end_datetime);
+      const isOverlapping = bStart < slotEnd && bEnd > slotStart;
+      
+      if (!isOverlapping) return false;
+      
+      if (activeTab === 'all') return true;
+      return b.service_type === activeTab;
+    }).length;
+  };
+
+  const getBlockedCountForSlot = (day: Date, hour: number, minutes: number): number => {
+    const slotStart = new Date(day);
+    slotStart.setHours(hour, minutes, 0, 0);
+    const slotEnd = new Date(slotStart);
+    slotEnd.setMinutes(slotEnd.getMinutes() + 15);
+
+    return availabilityBlocks.reduce((acc, block) => {
+      const bStart = new Date(block.start_datetime);
+      const bEnd = new Date(block.end_datetime);
+      const isOverlapping = bStart < slotEnd && bEnd > slotStart;
+      
+      if (!isOverlapping) return acc;
+      
+      if (activeTab === 'all') return acc + (block.quantity || 1);
+      if (block.service_type && block.service_type !== activeTab) return acc;
+      
+      return acc + (block.quantity || 1);
+    }, 0);
   };
 
   const getBookingDurationMinutes = (booking: Booking): number => {
@@ -1137,12 +1211,10 @@ export default function PlanningPage() {
                               const minutes = (slotIndex % 4) * 15;
                               const hours = getOpeningHoursForDay(day);
                               const isOpen = hours?.is_open;
-                              const block = getAvailabilityBlockForSlot(
-                                day,
-                                hour,
-                                minutes,
-                              );
-                              const isBlocked = !!block;
+                              const capacity = getCapacityForSlot(day, hour, minutes);
+                              const booked = getBookedCountForSlot(day, hour, minutes);
+                              const blocked = getBlockedCountForSlot(day, hour, minutes);
+                              const isFull = (booked + blocked) >= capacity;
                               const isSlotBooked = hasBookingOverlappingSlot(
                                 day,
                                 hour,
@@ -1155,12 +1227,12 @@ export default function PlanningPage() {
                                   className={`border-r group transition-colors
                                   ${!isOpen ? 'bg-gray-50/50' : 'bg-white'}
                                   ${
-                                    isBlocked
+                                    isFull && isOpen
                                       ? 'bg-gray-100/80 cursor-not-allowed'
                                       : ''
                                   }
                                   ${
-                                    !isBlocked && isOpen && !isSlotBooked
+                                    !isFull && isOpen && !isSlotBooked
                                       ? 'hover:bg-blue-50/50 cursor-pointer'
                                       : ''
                                   }
@@ -1176,7 +1248,7 @@ export default function PlanningPage() {
                                     gridColumn: `${dIdx + 1}`,
                                   }}
                                   onClick={() => {
-                                    if (!isBlocked && isOpen && !isSlotBooked) {
+                                    if (!isFull && isOpen && !isSlotBooked) {
                                       handleCreateBookingForDateTimeWithMinutes(
                                         day,
                                         hour,
@@ -1185,15 +1257,14 @@ export default function PlanningPage() {
                                     }
                                   }}
                                 >
-                                  {isBlocked && minutes === 0 && (
+                                  {isFull && isOpen && minutes === 0 && (
                                     <div
                                       className="text-[9px] text-gray-400 font-medium px-1 truncate"
-                                      title={block.reason}
                                     >
-                                      {block.reason || 'Indisponible'}
+                                      Complet
                                     </div>
                                   )}
-                                  {!isBlocked &&
+                                  {!isFull &&
                                     isOpen &&
                                     !isSlotBooked &&
                                     minutes === 0 && (
