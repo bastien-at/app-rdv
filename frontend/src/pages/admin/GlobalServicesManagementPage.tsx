@@ -26,6 +26,7 @@ export default function GlobalServicesManagementPage() {
   const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showOnlyEnabledForCurrentStore, setShowOnlyEnabledForCurrentStore] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [showStoreModal, setShowStoreModal] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
@@ -84,6 +85,7 @@ export default function GlobalServicesManagementPage() {
     return allServices.some(s => 
       s.store_id === storeId && 
       s.name === service.name &&
+      s.service_type === service.service_type &&
       !s.is_global &&
       s.active
     );
@@ -148,6 +150,7 @@ export default function GlobalServicesManagementPage() {
       
       if (editingService) {
         const updateData: UpdateServiceData = {
+          service_type: formData.service_type,
           name: formData.name,
           description: formData.description,
           price: parseFloat(formData.price),
@@ -206,25 +209,45 @@ export default function GlobalServicesManagementPage() {
     
     try {
       if (enabled) {
-        // Créer une copie du service pour ce magasin
-        const createData: CreateServiceData = {
-          store_id: storeId,
-          service_type: serviceToToggle.service_type,
-          name: serviceToToggle.name,
-          description: serviceToToggle.description,
-          price: serviceToToggle.price,
-          duration_minutes: serviceToToggle.duration_minutes,
-          category: serviceToToggle.category,
-          image_url: serviceToToggle.image_url,
-          is_global: false,
-          active: true
-        };
-        await createService(createData);
+        const existingLocalService = allServices.find(s => 
+          s.store_id === storeId &&
+          s.name === serviceToToggle.name &&
+          !s.is_global
+        );
+
+        if (existingLocalService) {
+          const updateData: UpdateServiceData = {
+            service_type: serviceToToggle.service_type,
+            name: serviceToToggle.name,
+            description: serviceToToggle.description,
+            price: serviceToToggle.price,
+            duration_minutes: serviceToToggle.duration_minutes,
+            category: serviceToToggle.category,
+            active: true,
+          };
+          await updateService(existingLocalService.id, updateData);
+        } else {
+          // Créer une copie du service pour ce magasin
+          const createData: CreateServiceData = {
+            store_id: storeId,
+            service_type: serviceToToggle.service_type,
+            name: serviceToToggle.name,
+            description: serviceToToggle.description,
+            price: serviceToToggle.price,
+            duration_minutes: serviceToToggle.duration_minutes,
+            category: serviceToToggle.category,
+            image_url: serviceToToggle.image_url,
+            is_global: false,
+            active: true
+          };
+          await createService(createData);
+        }
       } else {
         // Trouver et supprimer le service de ce magasin
         const storeService = allServices.find(s => 
           s.store_id === storeId && 
           s.name === serviceToToggle.name &&
+          s.service_type === serviceToToggle.service_type &&
           !s.is_global
         );
         if (storeService) {
@@ -264,6 +287,11 @@ export default function GlobalServicesManagementPage() {
 
   const [activeTab, setActiveTab] = useState<'all' | 'workshop' | 'fitting'>('all');
 
+  const currentStoreId =
+    typeof window !== 'undefined'
+      ? localStorage.getItem('admin_store_id') || sessionStorage.getItem('admin_store_id')
+      : null;
+
   // ... (rest of the state and useEffects)
 
   const filteredServices = services.filter(service =>
@@ -274,6 +302,10 @@ export default function GlobalServicesManagementPage() {
   const displayedServices = filteredServices.filter(service => {
     if (activeTab === 'all') return true;
     return service.service_type === activeTab;
+  }).filter(service => {
+    if (!currentStoreId) return true;
+    if (!showOnlyEnabledForCurrentStore) return true;
+    return isServiceEnabledForStore(service, currentStoreId);
   });
 
   if (loading) {
@@ -300,13 +332,15 @@ export default function GlobalServicesManagementPage() {
               <p className="text-gray-500 mt-1">Créez et gérez les prestations disponibles pour vos magasins</p>
             </div>
             <div className="flex items-center gap-3">
-              {(localStorage.getItem('admin_store_id') || sessionStorage.getItem('admin_store_id')) && (
+              
+
+              {currentStoreId && (
                 <Button
                   variant="ghost"
                   className="border border-gray-300 text-sm"
                   onClick={handleEnableAllForCurrentStore}
                 >
-                  Activer toutes les prestations pour mon magasin
+                  Tout activer pour mon magasin
                 </Button>
               )}
               <Button
@@ -399,7 +433,14 @@ export default function GlobalServicesManagementPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {displayedServices.map((service) => (
-                  <tr key={service.id} className="hover:bg-gray-50 transition-colors">
+                  <tr
+                    key={service.id}
+                    className={`hover:bg-gray-50 transition-colors ${
+                      currentStoreId && !isServiceEnabledForStore(service, currentStoreId)
+                        ? 'opacity-50'
+                        : ''
+                    }`}
+                  >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className={`flex-shrink-0 h-10 w-10 rounded-lg flex items-center justify-center ${
@@ -432,11 +473,23 @@ export default function GlobalServicesManagementPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        service.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                      }`}>
-                        {service.active ? 'Actif' : 'Inactif'}
-                      </span>
+                      {currentStoreId ? (
+                        isServiceEnabledForStore(service, currentStoreId) ? (
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                            Activée
+                          </span>
+                        ) : (
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-700">
+                            Non activée
+                          </span>
+                        )
+                      ) : (
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          service.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {service.active ? 'Actif' : 'Inactif'}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">

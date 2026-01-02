@@ -216,6 +216,7 @@ export default function ModernBookingPage() {
     setSubmitting(true);
     
     try {
+      const sourceParam = searchParams.get('source');
       const bookingData: CreateBookingData = {
         store_id: store.id,
         service_id: selectedService.id,
@@ -225,6 +226,7 @@ export default function ModernBookingPage() {
         customer_lastname: formData.lastname,
         customer_email: formData.email,
         customer_phone: formData.phone,
+        source: sourceParam || (isAdmin ? 'admin' : undefined),
         customer_data: {
           height: formData.height ? parseInt(formData.height) : undefined,
           weight: formData.weight ? parseInt(formData.weight) : undefined,
@@ -238,7 +240,12 @@ export default function ModernBookingPage() {
       console.log('📤 Envoi de la réservation:', bookingData);
       const booking = await createBooking(bookingData);
       console.log('✅ Réservation créée:', booking);
-      navigate(`/booking/${booking.booking_token}`);
+      const source = searchParams.get('source');
+      if (source === 'admin') {
+        navigate('/admin/planning');
+      } else {
+        navigate(`/booking/${booking.booking_token}`);
+      }
     } catch (error: any) {
       console.error('❌ Erreur lors de la création de la réservation:', error);
       console.error('Détails:', error.response?.data || error.message);
@@ -437,6 +444,9 @@ export default function ModernBookingPage() {
                         ))}
                       </div>
                       <div className="grid grid-cols-7 gap-1">
+                        {[...Array(((startOfMonth(currentMonth).getDay() + 6) % 7))].map((_, i) => (
+                          <div key={`empty-${i}`} className="aspect-square" />
+                        ))}
                         {getDaysInMonth().map((day, i) => {
                           const isPast = isBefore(day, startOfDay(new Date()));
                           const isSelected = selectedDate && isSameDay(day, selectedDate);
@@ -482,16 +492,17 @@ export default function ModernBookingPage() {
                         </div>
                       ) : (
                         <div className="grid grid-cols-3 gap-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                          {availableSlots.map((slot, i) => {
+                          {availableSlots
+                            .filter(slot => isAdmin || slot.available !== false)
+                            .map((slot, i) => {
                             const isBooked = slot.available === false;
                             return (
                               <button
                                 key={i}
-                                onClick={() => !isBooked && handleSlotSelect(slot)}
-                                disabled={isBooked}
+                                onClick={() => handleSlotSelect(slot)}
                                 className={`py-1.5 px-1 rounded-md text-xs font-medium transition-all
                                   ${isBooked
-                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed line-through'
+                                    ? 'bg-orange-50 border border-orange-200 text-orange-700 hover:bg-orange-100'
                                     : selectedSlot === slot
                                       ? 'bg-[#005162] text-white shadow-sm'
                                       : 'bg-white border border-gray-200 text-gray-700 hover:border-[#005162] hover:text-[#005162]'
@@ -499,6 +510,7 @@ export default function ModernBookingPage() {
                                 `}
                               >
                                 {format(new Date(slot.start_datetime), 'HH:mm')}
+                                {isBooked && isAdmin && <span className="block text-[8px] font-bold">(Complet)</span>}
                               </button>
                             );
                           })}

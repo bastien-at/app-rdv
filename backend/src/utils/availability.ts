@@ -77,7 +77,7 @@ export const calculateAvailableSlots = async (
   const existingBookings = bookingsResult.rows;
   
   // 6. Récupérer les blocages de disponibilité
-  const blocksResult = await query<AvailabilityBlock & { service_type?: string }>(
+  const blocksResult = await query<AvailabilityBlock & { service_type?: string, quantity?: number }>(
     `SELECT * FROM availability_blocks 
      WHERE store_id = $1 
      AND DATE(start_datetime) <= DATE($2)
@@ -109,7 +109,8 @@ export const calculateAvailableSlots = async (
   
   // 8. Filtrer les créneaux disponibles - VERSION AVEC CAPACITÉ PAR TYPE DE SERVICE
   const workshopCapacity = store.workshop_capacity || 1;
-  const capacity = service.service_type === 'workshop' ? workshopCapacity : 1; // Pour le fitting, on garde 1 pour l'instant
+  const fittingCapacity = store.fitting_capacity || 1;
+  const capacity = service.service_type === 'workshop' ? workshopCapacity : fittingCapacity;
 
   const availableSlots = allSlots.map(slot => {
     const slotStart = new Date(slot.start_datetime);
@@ -140,21 +141,28 @@ export const calculateAvailableSlots = async (
     // Un blocage affecte le créneau si :
     // 1. Il n'a pas de service_type (blocage global du magasin)
     // 2. Il a le même service_type que le service demandé
-    const hasBlockConflict = blocks.some((block: any) => {
+    const blockedQuantity = blocks.reduce((acc: number, block: any) => {
       // Si le blocage est spécifique à un autre type de service, on l'ignore
       if (block.service_type && block.service_type !== service.service_type) {
-        return false;
+        return acc;
       }
 
       const blockStart = new Date(block.start_datetime);
       const blockEnd = new Date(block.end_datetime);
       
-      return (
-        slotStart < blockEnd && slotEnd > blockStart
-      );
-    });
+      const isOverlapping = slotStart < blockEnd && slotEnd > blockStart;
+      
+      if (isOverlapping) {
+        return acc + (block.quantity || 1);
+      }
+      
+      return acc;
+    }, 0);
     
-    if (hasBlockConflict) {
+    // Capacité restante après blocages
+    const capacityAfterBlocks = capacity - blockedQuantity;
+    
+    if (capacityAfterBlocks <= 0) {
       return { ...slot, available: false };
     }
     
@@ -173,8 +181,8 @@ export const calculateAvailableSlots = async (
       );
     });
     
-    // Capacité restante après réservations
-    const remainingCapacity = capacity - concurrentBookings.length;
+    // Capacité restante après réservations ET blocages
+    const remainingCapacity = capacityAfterBlocks - concurrentBookings.length;
     
     // Si les locks dépassent la capacité restante
     if (concurrentLocks.length >= remainingCapacity) {
@@ -221,7 +229,8 @@ export const removeBookingLock = async (sessionId: string): Promise<void> => {
 export const isSlotAvailable = async (
   storeId: string,
   serviceId: string,
-  startDatetime: Date
+  startDatetime: Date,
+  allowOverride: boolean = false
 ): Promise<boolean> => {
   const slots = await calculateAvailableSlots(storeId, serviceId, startDatetime);
   
@@ -233,5 +242,14 @@ export const isSlotAvailable = async (
     return timeDiff < 60000; // Moins d'une minute de différence
   });
   
-  return requestedSlot?.available || false;
+  if (!requestedSlot) return false;
+  if (requestedSlot.available) return true;
+  
+  // Si le créneau n'est pas disponible mais qu'on autorise l'override (admin)
+  if (allowOverride) {
+    console.warn(`[Admin Override] Booking allowed on full slot for store ${storeId}, service ${serviceId} at ${startDatetime.toISOString()}`);
+    return true;
+  }
+  
+  return false;
 };
