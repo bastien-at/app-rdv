@@ -73,6 +73,7 @@ interface AvailabilityBlock {
   reason: string;
   block_type: 'closure' | 'maintenance' | 'holiday' | 'other';
   service_type?: 'fitting' | 'workshop' | null;
+  quantity?: number;
 }
 
 interface OpeningHours {
@@ -406,56 +407,34 @@ export default function PlanningPage() {
       new Date(a.start_datetime).getTime() - new Date(b.start_datetime).getTime()
     );
 
-    const columns: Booking[][] = []; // Represents visual columns within the day column
+    const groups: Booking[][] = [];
     sorted.forEach(booking => {
       let placed = false;
-      for (let i = 0; i < columns.length; i++) {
-        const lastInColumn = columns[i][columns[i].length - 1];
-        const lastEnd = new Date(lastInColumn.end_datetime).getTime();
-        const currentStart = new Date(booking.start_datetime).getTime();
-        
-        // If this booking starts after the last one in this column ends, it can go here
-        if (currentStart >= lastEnd) {
-          columns[i].push(booking);
+      for (const group of groups) {
+        const isConcurrent = group.some(b => {
+          const aStart = new Date(booking.start_datetime).getTime();
+          const aEnd = new Date(booking.end_datetime).getTime();
+          const bStart = new Date(b.start_datetime).getTime();
+          const bEnd = new Date(b.end_datetime).getTime();
+          return aStart < bEnd && aEnd > bStart;
+        });
+
+        if (isConcurrent) {
+          group.push(booking);
           placed = true;
           break;
         }
       }
-      if (!placed) columns.push([booking]);
+      if (!placed) groups.push([booking]);
     });
 
-    // For each booking, find how many total columns are needed during its duration
-    // to calculate the correct width and offset
     return dayBookings.map(b => {
-      const bStart = new Date(b.start_datetime).getTime();
-      const bEnd = new Date(b.end_datetime).getTime();
-      
-      const columnIndex = columns.findIndex(col => col.includes(b));
-      
-      // Overlap detection: find all bookings that overlap with this one
-      const overlappingBookings = dayBookings.filter(other => {
-        const otherStart = new Date(other.start_datetime).getTime();
-        const otherEnd = new Date(other.end_datetime).getTime();
-        return bStart < otherEnd && bEnd > otherStart;
-      });
-
-      // Max columns needed during this booking's interval
-      // We calculate the maximum number of concurrent bookings at any single point in time
-      // within this booking's duration.
-      let maxConcurrentAtAnyPoint = 0;
-      // Simple heuristic: count how many visual columns are active during this booking
-      const activeColumns = columns.filter(col => 
-        col.some(other => {
-          const otherStart = new Date(other.start_datetime).getTime();
-          const otherEnd = new Date(other.end_datetime).getTime();
-          return bStart < otherEnd && bEnd > otherStart;
-        })
-      ).length;
-
+      const group = groups.find(g => g.includes(b)) || [b];
+      const indexInGroup = group.indexOf(b);
       return {
         ...b,
-        concurrent_count: Math.max(activeColumns, 1),
-        concurrent_index: columnIndex
+        concurrent_count: group.length,
+        concurrent_index: indexInGroup
       };
     });
   };
@@ -1313,6 +1292,7 @@ export default function PlanningPage() {
                                 width: `calc(${widthPct}% - 2px)`,
                                 left: `calc(${leftPct}%)`,
                                 gridColumn: `${dayIdx + 1} / span 1`,
+                                position: 'absolute',
                               }}
                               className={`rounded shadow-sm border px-1.5 py-0.5 text-[10px] cursor-pointer hover:brightness-95 overflow-hidden ${getStatusColor(
                                 b.status,
