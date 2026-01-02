@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0",
+  "changelog": [
+    {
+      "version": "1.0.0",
+      "date": "2025-12-30",
+      "changes": [
+        "Initialisation du changelog",
+        "Affichage du numéro de version dans l'espace admin"
+      ]
+    }, 
+     {
+      "version": "1.1.0",
+      "date": "2026-01-02",
+      "changes": [
+        "Initialisation du changelog",
+        "Affichage du numéro de version dans l'espace admin"
+      ]
+    }, 
+     {
+      "version": "1.4.0",
+      "date": "2026-01-02",
+      "changes": [
+        "Initialisation du changelog",
+        "Affichage du numéro de version dans l'espace admin"
+      ]
+    }
+  ]
+}

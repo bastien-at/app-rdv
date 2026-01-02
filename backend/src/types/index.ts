@@ -76,6 +76,7 @@ export interface CreateServiceData {
 }
 
 export interface UpdateServiceData {
+  service_type?: 'fitting' | 'workshop';
   name?: string;
   description?: string;
   duration_minutes?: number;
