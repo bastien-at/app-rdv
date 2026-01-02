@@ -85,6 +85,7 @@ export const createBooking = async (
       customer_phone,
       customer_data,
       source,
+      status,
     } = req.body;
     
     console.log('📝 [createBooking] Reçu pour:', customer_email, 'Source:', source);
@@ -141,7 +142,7 @@ export const createBooking = async (
           technician_id || null,
           startDate,
           endDate,
-          'pending',
+          status || 'pending',
           customer_firstname,
           customer_lastname,
           customer_email,

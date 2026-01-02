@@ -104,6 +104,7 @@ export interface CreateBookingData {
   customer_phone: string;
   customer_data: CustomerData;
   source?: string;
+  status?: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
 }
 
 export interface CustomerData {

@@ -215,8 +215,10 @@ export default function ModernBookingPage() {
     
     setSubmitting(true);
     
+    const sourceParam = searchParams.get('source');
+    const sourceVal = sourceParam || (isAdmin ? 'admin' : undefined);
+    
     try {
-      const sourceParam = searchParams.get('source');
       const bookingData: CreateBookingData = {
         store_id: store.id,
         service_id: selectedService.id,
@@ -226,7 +228,8 @@ export default function ModernBookingPage() {
         customer_lastname: formData.lastname,
         customer_email: formData.email,
         customer_phone: formData.phone,
-        source: sourceParam || (isAdmin ? 'admin' : undefined),
+        status: sourceVal === 'admin' ? 'confirmed' : 'pending',
+        source: sourceVal || undefined,
         customer_data: {
           height: formData.height ? parseInt(formData.height) : undefined,
           weight: formData.weight ? parseInt(formData.weight) : undefined,
