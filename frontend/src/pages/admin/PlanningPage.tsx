@@ -696,7 +696,7 @@ export default function PlanningPage() {
     return Math.max(store.fitting_capacity || 1, store.workshop_capacity || 1);
   };
 
-  const getBookedCountForSlot = (day: Date, hour: number, minutes: number): number => {
+  const getBookedCountForSlot = (day: Date, hour: number, minutes: number, serviceType?: 'fitting' | 'workshop'): number => {
     const slotStart = new Date(day);
     slotStart.setHours(hour, minutes, 0, 0);
     const slotEnd = new Date(slotStart);
@@ -710,12 +710,13 @@ export default function PlanningPage() {
       
       if (!isOverlapping) return false;
       
+      if (serviceType) return b.service_type === serviceType;
       if (activeTab === 'all') return true;
       return b.service_type === activeTab;
     }).length;
   };
 
-  const getBlockedCountForSlot = (day: Date, hour: number, minutes: number): number => {
+  const getBlockedCountForSlot = (day: Date, hour: number, minutes: number, serviceType?: 'fitting' | 'workshop'): number => {
     const slotStart = new Date(day);
     slotStart.setHours(hour, minutes, 0, 0);
     const slotEnd = new Date(slotStart);
@@ -728,6 +729,11 @@ export default function PlanningPage() {
       
       if (!isOverlapping) return acc;
       
+      if (serviceType) {
+        if (block.service_type && block.service_type !== serviceType) return acc;
+        return acc + (block.quantity || 1);
+      }
+
       if (activeTab === 'all') return acc + (block.quantity || 1);
       if (block.service_type && block.service_type !== activeTab) return acc;
       
@@ -1190,10 +1196,24 @@ export default function PlanningPage() {
                               const minutes = (slotIndex % 4) * 15;
                               const hours = getOpeningHoursForDay(day);
                               const isOpen = hours?.is_open;
-                              const capacity = getCapacityForSlot(day, hour, minutes);
-                              const booked = getBookedCountForSlot(day, hour, minutes);
-                              const blocked = getBlockedCountForSlot(day, hour, minutes);
-                              const isFull = (booked + blocked) >= capacity;
+                              
+                              const store = stores.find(s => s.id === selectedStore);
+                              const fCap = store?.fitting_capacity || 1;
+                              const wCap = store?.workshop_capacity || 1;
+
+                              const fBooked = getBookedCountForSlot(day, hour, minutes, 'fitting');
+                              const fBlocked = getBlockedCountForSlot(day, hour, minutes, 'fitting');
+                              const wBooked = getBookedCountForSlot(day, hour, minutes, 'workshop');
+                              const wBlocked = getBlockedCountForSlot(day, hour, minutes, 'workshop');
+
+                              const fFull = (fBooked + fBlocked) >= fCap;
+                              const wFull = (wBooked + wBlocked) >= wCap;
+
+                              let isFull = false;
+                              if (activeTab === 'fitting') isFull = fFull;
+                              else if (activeTab === 'workshop') isFull = wFull;
+                              else isFull = fFull && wFull; // Dans 'Tous les RDV', c'est complet uniquement si les DEUX sont pleins
+
                               const isSlotBooked = hasBookingOverlappingSlot(
                                 day,
                                 hour,
