@@ -38,6 +38,8 @@ import { getAdminToken, adminConfirmBooking } from '../../services/api';
 interface Store {
   id: string;
   name: string;
+  workshop_capacity?: number;
+  fitting_capacity?: number;
 }
 
 interface Booking {
@@ -71,6 +73,7 @@ interface AvailabilityBlock {
   reason: string;
   block_type: 'closure' | 'maintenance' | 'holiday' | 'other';
   service_type?: 'fitting' | 'workshop' | null;
+  quantity?: number;
 }
 
 interface OpeningHours {
@@ -682,6 +685,62 @@ export default function PlanningPage() {
     });
   };
 
+  const getCapacityForSlot = (day: Date, hour: number, minutes: number): number => {
+    if (!selectedStore) return 1;
+    const store = stores.find(s => s.id === selectedStore);
+    if (!store) return 1;
+
+    if (activeTab === 'fitting') return store.fitting_capacity || 1;
+    if (activeTab === 'workshop') return store.workshop_capacity || 1;
+    
+    return Math.max(store.fitting_capacity || 1, store.workshop_capacity || 1);
+  };
+
+  const getBookedCountForSlot = (day: Date, hour: number, minutes: number, serviceType?: 'fitting' | 'workshop'): number => {
+    const slotStart = new Date(day);
+    slotStart.setHours(hour, minutes, 0, 0);
+    const slotEnd = new Date(slotStart);
+    slotEnd.setMinutes(slotEnd.getMinutes() + 15);
+
+    return bookings.filter(b => {
+      if (b.status === 'cancelled') return false;
+      const bStart = new Date(b.start_datetime);
+      const bEnd = new Date(b.end_datetime);
+      const isOverlapping = bStart < slotEnd && bEnd > slotStart;
+      
+      if (!isOverlapping) return false;
+      
+      if (serviceType) return b.service_type === serviceType;
+      if (activeTab === 'all') return true;
+      return b.service_type === activeTab;
+    }).length;
+  };
+
+  const getBlockedCountForSlot = (day: Date, hour: number, minutes: number, serviceType?: 'fitting' | 'workshop'): number => {
+    const slotStart = new Date(day);
+    slotStart.setHours(hour, minutes, 0, 0);
+    const slotEnd = new Date(slotStart);
+    slotEnd.setMinutes(slotEnd.getMinutes() + 15);
+
+    return availabilityBlocks.reduce((acc, block) => {
+      const bStart = new Date(block.start_datetime);
+      const bEnd = new Date(block.end_datetime);
+      const isOverlapping = bStart < slotEnd && bEnd > slotStart;
+      
+      if (!isOverlapping) return acc;
+      
+      if (serviceType) {
+        if (block.service_type && block.service_type !== serviceType) return acc;
+        return acc + (block.quantity || 1);
+      }
+
+      if (activeTab === 'all') return acc + (block.quantity || 1);
+      if (block.service_type && block.service_type !== activeTab) return acc;
+      
+      return acc + (block.quantity || 1);
+    }, 0);
+  };
+
   const getBookingDurationMinutes = (booking: Booking): number => {
     if (
       typeof booking.service_duration === 'number' &&
@@ -1137,12 +1196,24 @@ export default function PlanningPage() {
                               const minutes = (slotIndex % 4) * 15;
                               const hours = getOpeningHoursForDay(day);
                               const isOpen = hours?.is_open;
-                              const block = getAvailabilityBlockForSlot(
-                                day,
-                                hour,
-                                minutes,
-                              );
-                              const isBlocked = !!block;
+                              
+                              const store = stores.find(s => s.id === selectedStore);
+                              const fCap = store?.fitting_capacity || 1;
+                              const wCap = store?.workshop_capacity || 1;
+
+                              const fBooked = getBookedCountForSlot(day, hour, minutes, 'fitting');
+                              const fBlocked = getBlockedCountForSlot(day, hour, minutes, 'fitting');
+                              const wBooked = getBookedCountForSlot(day, hour, minutes, 'workshop');
+                              const wBlocked = getBlockedCountForSlot(day, hour, minutes, 'workshop');
+
+                              const fFull = (fBooked + fBlocked) >= fCap;
+                              const wFull = (wBooked + wBlocked) >= wCap;
+
+                              let isFull = false;
+                              if (activeTab === 'fitting') isFull = fFull;
+                              else if (activeTab === 'workshop') isFull = wFull;
+                              else isFull = fFull && wFull; // Dans 'Tous les RDV', c'est complet uniquement si les DEUX sont pleins
+
                               const isSlotBooked = hasBookingOverlappingSlot(
                                 day,
                                 hour,
@@ -1155,12 +1226,12 @@ export default function PlanningPage() {
                                   className={`border-r group transition-colors
                                   ${!isOpen ? 'bg-gray-50/50' : 'bg-white'}
                                   ${
-                                    isBlocked
+                                    isFull && isOpen
                                       ? 'bg-gray-100/80 cursor-not-allowed'
                                       : ''
                                   }
                                   ${
-                                    !isBlocked && isOpen && !isSlotBooked
+                                    !isFull && isOpen && !isSlotBooked
                                       ? 'hover:bg-blue-50/50 cursor-pointer'
                                       : ''
                                   }
@@ -1176,7 +1247,7 @@ export default function PlanningPage() {
                                     gridColumn: `${dIdx + 1}`,
                                   }}
                                   onClick={() => {
-                                    if (!isBlocked && isOpen && !isSlotBooked) {
+                                    if (!isFull && isOpen && !isSlotBooked) {
                                       handleCreateBookingForDateTimeWithMinutes(
                                         day,
                                         hour,
@@ -1185,15 +1256,14 @@ export default function PlanningPage() {
                                     }
                                   }}
                                 >
-                                  {isBlocked && minutes === 0 && (
+                                  {isFull && isOpen && minutes === 0 && (
                                     <div
                                       className="text-[9px] text-gray-400 font-medium px-1 truncate"
-                                      title={block.reason}
                                     >
-                                      {block.reason || 'Indisponible'}
+                                      Complet
                                     </div>
                                   )}
-                                  {!isBlocked &&
+                                  {!isFull &&
                                     isOpen &&
                                     !isSlotBooked &&
                                     minutes === 0 && (
@@ -1242,6 +1312,7 @@ export default function PlanningPage() {
                                 width: `calc(${widthPct}% - 2px)`,
                                 left: `calc(${leftPct}%)`,
                                 gridColumn: `${dayIdx + 1} / span 1`,
+                                position: 'absolute',
                               }}
                               className={`rounded shadow-sm border px-1.5 py-0.5 text-[10px] cursor-pointer hover:brightness-95 overflow-hidden ${getStatusColor(
                                 b.status,
