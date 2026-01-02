@@ -1,0 +1,67 @@
+name: Changelog Auto-Update
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+jobs:
+  update-changelog:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout du Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 50
+
+      - name: Générer changelog.json
+        shell: bash
+        run: |
+          mkdir -p frontend/public
+          node - <<'NODE'
+          const { execSync } = require('child_process');
+
+          const raw = execSync(
+            'git log -n 50 --date=iso-strict --pretty=format:%H|%an|%ad|%s',
+            { encoding: 'utf8' }
+          ).trim();
+
+          const entries = raw
+            ? raw.split('\n').map((line) => {
+                const [hash, author, date, ...subjectParts] = line.split('|');
+                return {
+                  hash,
+                  author,
+                  date,
+                  subject: subjectParts.join('|'),
+                };
+              })
+            : [];
+
+          const data = {
+            generatedAt: new Date().toISOString(),
+            entries,
+          };
+
+          const fs = require('fs');
+          fs.writeFileSync('frontend/public/changelog.json', JSON.stringify(data, null, 2) + '\n');
+          NODE
+
+      - name: Commit & push si changement
+        shell: bash
+        run: |
+          if git diff --quiet -- frontend/public/changelog.json; then
+            echo "Aucun changement détecté"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add frontend/public/changelog.json
+          git commit -m "chore: update changelog"
+          git push
