@@ -50,9 +50,29 @@ export default function ModernBookingPage() {
   });
 
   useEffect(() => {
-    const token = localStorage.getItem('admin_token');
-    setIsAdmin(!!token);
-  }, []);
+    const checkAdmin = () => {
+      const token = localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token');
+      const sourceFromUrl = searchParams.get('source') === 'admin';
+      const isCurrentlyAdmin = !!token || sourceFromUrl;
+      
+      console.error('CRITICAL DEBUG [checkAdmin]:', { 
+        hasToken: !!token, 
+        sourceFromUrl, 
+        isCurrentlyAdmin 
+      });
+      
+      // Use window.alert to be 100% sure we are seeing output
+      if (sourceFromUrl) {
+        console.warn('ADMIN SOURCE DETECTED VIA URL');
+      }
+      
+      setIsAdmin(isCurrentlyAdmin);
+    };
+
+    checkAdmin();
+    window.addEventListener('storage', checkAdmin);
+    return () => window.removeEventListener('storage', checkAdmin);
+  }, [searchParams]);
 
   useEffect(() => {
     const search = async () => {
@@ -196,6 +216,7 @@ export default function ModernBookingPage() {
   };
 
   const handleSlotSelect = (slot: TimeSlot) => {
+    console.log('DEBUG: slot selected', slot);
     setSelectedSlot(slot);
   };
 
@@ -217,8 +238,7 @@ export default function ModernBookingPage() {
     
     const sourceParam = searchParams.get('source');
     const sourceVal = sourceParam || (isAdmin ? 'admin' : undefined);
-    
-    console.log('DEBUG: sourceParam=', sourceParam, 'isAdmin=', isAdmin, 'sourceVal=', sourceVal);
+    const targetStatus = (sourceVal === 'admin' || isAdmin) ? 'confirmed' : 'pending';
     
     try {
       const bookingData: CreateBookingData = {
@@ -230,7 +250,7 @@ export default function ModernBookingPage() {
         customer_lastname: formData.lastname,
         customer_email: formData.email,
         customer_phone: formData.phone,
-        status: (sourceVal === 'admin') ? 'confirmed' : 'pending',
+        status: targetStatus,
         source: sourceVal || undefined,
         customer_data: {
           height: formData.height ? parseInt(formData.height) : undefined,
@@ -242,11 +262,9 @@ export default function ModernBookingPage() {
         },
       };
       
-      console.log('📤 Envoi de la réservation:', bookingData);
       const booking = await createBooking(bookingData);
-      console.log('✅ Réservation créée:', booking);
-      const source = searchParams.get('source');
-      if (source === 'admin') {
+      
+      if ((sourceVal === 'admin' || isAdmin)) {
         navigate('/admin/planning');
       } else {
         navigate(`/booking/${booking.booking_token}`);
@@ -367,7 +385,12 @@ export default function ModernBookingPage() {
             )}
 
             {/* Step Content */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative">
+              {isAdmin && (
+                <div className="absolute -top-3 -right-3 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg z-50 animate-bounce">
+                  MODE ADMIN ACTIF
+                </div>
+              )}
               {step === 'service' && (
                 <div className="space-y-4">
                   <h2 className="text-xl font-extrabold text-[#142129]">Choisissez votre service</h2>
