@@ -1,0 +1,36 @@
+requarks:
+  enabled: true
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      kubernetes.io/ingress.class: nginx
+      cert-manager.io/cluster-issuer: letsencrypt
+      nginx.ingress.kubernetes.io/proxy-body-size: 10m
+      nginx.ingress.kubernetes.io/whitelist-source-range: "62.210.24.239/32,62.4.14.164/32,90.85.178.3/32,83.118.207.126/32,92.168.105.189/32"
+  service:
+    type: ClusterIP
+    port: 80
+  postgresql:
+    image:
+      repository: bitnamilegacy/postgresql
+      tag: 11.5.0-r60
+    volumePermissions:
+      image:
+        repository: bitnami/minideb
+        tag: trixie
+
+kroki:
+  enabled: true
+  ingress:
+    enabled: true
+    ingressClassName: "nginx"
+    annotations:
+      kubernetes.io/ingress.class: nginx
+      cert-manager.io/cluster-issuer: letsencrypt
+      nginx.ingress.kubernetes.io/proxy-body-size: 10m
+      nginx.ingress.kubernetes.io/whitelist-source-range: "62.210.24.239/32,62.4.14.164/32,90.85.178.3/32,83.118.207.126/32,92.168.105.189/32"
+  service:
+    type: ClusterIP
+    ports:
+      http: 80

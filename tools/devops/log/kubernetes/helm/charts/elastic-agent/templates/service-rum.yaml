@@ -1,0 +1,24 @@
+{{- if and ( .Values.rum.enabled ) ( .Values.rum.service.type ) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "elastic-agent.name" . }}-real-user-monitoring
+  namespace: {{ .Values.namespace }}
+  labels:
+    app.kubernetes.io/name: elastic-agent-real-user-monitoring
+    {{- include "elastic-agent.labels" . | nindent 4 }}
+  {{- with .Values.rum.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.rum.service.type }}
+  ports:
+    {{- range $name, $value := .Values.rum.service.ports }}
+    - name: {{ $name }}
+      port: {{ $value }}
+      targetPort: {{ $name }}
+    {{- end }}
+  selector:
+    app.kubernetes.io/name: elastic-agent-real-user-monitoring
+{{- end }}

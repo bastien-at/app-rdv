@@ -1,0 +1,11 @@
+# Contains legacy local port mapping
+# You are a very bag guy if you use this file !
+
+services:
+  elasticsearch:
+    environment:
+      ES_JAVA_OPTS: -Xms512m -Xmx512m
+
+  kibana:
+    environment:
+      KIBANA_PUBLIC_BASEURL: https://kibana.local:5601

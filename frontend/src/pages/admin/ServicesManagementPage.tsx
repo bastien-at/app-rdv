@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { 
   Plus, 
   Edit2, 
@@ -14,20 +14,26 @@ import {
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import AdminLayout from '../../components/admin/AdminLayout';
-import { getAllServices, createService, updateService, deleteService, getServiceCategories } from '../../services/api';
-import { Service as ServiceType, CreateServiceData, UpdateServiceData } from '../../types';
+import { getAllServices, createService, updateService, deleteService, getStoreById } from '../../services/api';
+import { Service as ServiceType, CreateServiceData, UpdateServiceData, Store } from '../../types';
 
 // Utiliser le type Service de types/index.ts
 type Service = ServiceType;
 
 export default function ServicesManagementPage() {
-  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [services, setServices] = useState<Service[]>([]);
+  const [store, setStore] = useState<Store | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [clientView, setClientView] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
-  
+  const storeId =
+    typeof window !== 'undefined'
+      ? localStorage.getItem('admin_store_id') || sessionStorage.getItem('admin_store_id')
+      : null;
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -47,8 +53,48 @@ export default function ServicesManagementPage() {
   const loadServices = async () => {
     setLoading(true);
     try {
-      const data = await getAllServices();
-      setServices(data);
+      const requestedType = searchParams.get('type') as 'fitting' | 'workshop' | null;
+
+      const [servicesData, storeData] = await Promise.all([
+        getAllServices(storeId ? { store_id: storeId } : undefined),
+        storeId ? getStoreById(storeId) : Promise.resolve(null),
+      ]);
+
+      if (storeData) {
+        setStore(storeData);
+      }
+
+      let localServices: Service[];
+      if (storeId) {
+        localServices = servicesData.filter((s) => s.store_id === storeId && !s.is_global);
+      } else {
+        localServices = servicesData.filter((s) => !s.is_global);
+      }
+
+      if (clientView) {
+        localServices = localServices.filter((s) => s.active);
+        if (storeData?.has_workshop === false) {
+          localServices = localServices.filter((s) => s.service_type !== 'workshop');
+        }
+        if (storeData?.has_fitting === false) {
+          localServices = localServices.filter((s) => s.service_type !== 'fitting');
+        }
+        if (requestedType) {
+          localServices = localServices.filter((s) => s.service_type === requestedType);
+        }
+      }
+
+      localServices = localServices.sort((a, b) => {
+        if (a.service_type !== b.service_type) {
+          return a.service_type.localeCompare(b.service_type);
+        }
+        if (a.price !== b.price) {
+          return a.price - b.price;
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+      setServices(localServices);
     } catch (error) {
       console.error('Erreur chargement services:', error);
       alert('Erreur lors du chargement des services');
@@ -56,6 +102,10 @@ export default function ServicesManagementPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadServices();
+  }, [clientView]);
 
   const handleOpenModal = (service?: Service) => {
     if (service) {
@@ -111,6 +161,7 @@ export default function ServicesManagementPage() {
       if (editingService) {
         // Modification
         const updateData: UpdateServiceData = {
+          service_type: formData.service_type,
           name: formData.name,
           description: formData.description,
           price: parseFloat(formData.price),
@@ -123,13 +174,14 @@ export default function ServicesManagementPage() {
       } else {
         // Création
         const createData: CreateServiceData = {
+          store_id: storeId || undefined,
           service_type: formData.service_type,
           name: formData.name,
           description: formData.description,
           price: parseFloat(formData.price),
           duration_minutes: parseInt(formData.duration_minutes),
           category: formData.category,
-          is_global: formData.is_global,
+          is_global: false,
           active: formData.is_active
         };
         await createService(createData);
@@ -197,6 +249,24 @@ export default function ServicesManagementPage() {
 
           {/* Search */}
           <div className="mt-6">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="client_view"
+                  checked={clientView}
+                  onChange={(e) => setClientView(e.target.checked)}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="client_view" className="text-sm font-medium text-gray-700">
+                  Vue client
+                </label>
+              </div>
+              {store && (
+                <div className="text-sm text-gray-500">{store.city}</div>
+              )}
+            </div>
+
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
               <input
@@ -204,7 +274,7 @@ export default function ServicesManagementPage() {
                 placeholder="Rechercher une prestation..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
           </div>
@@ -466,24 +536,24 @@ export default function ServicesManagementPage() {
                   Prestation active (visible pour les clients)
                 </label>
               </div>
-            </form>
 
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={handleCloseModal}
-              >
-                Annuler
-              </Button>
-              <Button
-                onClick={handleSubmit}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                {editingService ? 'Enregistrer' : 'Créer la prestation'}
-              </Button>
-            </div>
+              {/* Footer */}
+              <div className="flex items-center justify-end gap-3 p-6 border-t border-gray-200">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleCloseModal}
+                >
+                  Annuler
+                </Button>
+                <Button
+                  type="submit"
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {editingService ? 'Enregistrer' : 'Créer la prestation'}
+                </Button>
+              </div>
+            </form>
           </div>
         </div>
       )}

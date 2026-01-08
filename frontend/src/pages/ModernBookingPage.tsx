@@ -49,29 +49,54 @@ export default function ModernBookingPage() {
     acceptTerms: false,
   });
 
+  // Scroll to top on step change
   useEffect(() => {
-    const token = localStorage.getItem('admin_token');
-    setIsAdmin(!!token);
-  }, []);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [step]);
 
+  // Check admin status
   useEffect(() => {
+    const checkAdmin = () => {
+      const token = localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token');
+      const sourceFromUrl = searchParams.get('source') === 'admin';
+      const isCurrentlyAdmin = !!token || sourceFromUrl;
+      
+      setIsAdmin(isCurrentlyAdmin);
+    };
+
+    checkAdmin();
+    window.addEventListener('storage', checkAdmin);
+    return () => window.removeEventListener('storage', checkAdmin);
+  }, [searchParams]);
+
+  // Customer search with abort controller
+  useEffect(() => {
+    if (customerSearchQuery.length < 2 || !storeId) {
+      setCustomerSearchResults([]);
+      setShowCustomerResults(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    
     const search = async () => {
-      if (customerSearchQuery.length >= 2 && storeId) {
-        try {
-          const results = await searchCustomers(storeId, customerSearchQuery);
-          setCustomerSearchResults(results);
-          setShowCustomerResults(true);
-        } catch (error) {
+      try {
+        const results = await searchCustomers(storeId, customerSearchQuery);
+        setCustomerSearchResults(results);
+        setShowCustomerResults(true);
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
           console.error('Erreur recherche client:', error);
         }
-      } else {
-        setCustomerSearchResults([]);
-        setShowCustomerResults(false);
       }
     };
 
     const timeoutId = setTimeout(search, 300);
-    return () => clearTimeout(timeoutId);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [customerSearchQuery, storeId]);
 
   const handleCustomerSelect = (customer: CustomerSearchResult) => {
@@ -86,89 +111,115 @@ export default function ModernBookingPage() {
     setShowCustomerResults(false);
   };
 
+  // Load store data (single useEffect)
   useEffect(() => {
-    if (storeSlug) {
-      resolveStoreId();
-    }
-  }, [storeSlug]);
-  
-  useEffect(() => {
-    if (storeId) {
-      loadStoreData();
-    }
-  }, [storeId]);
+    const loadStore = async () => {
+      if (!storeSlug) return;
+      
+      setLoading(true);
+      try {
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storeSlug);
+        
+        // Load store
+        const storeData = isUUID 
+          ? await getStoreById(storeSlug) 
+          : await getStoreBySlug(storeSlug);
+        
+        setStore(storeData);
+        setStoreId(storeData.id);
+        
+        // Load services
+        const servicesData = await getStoreServices(storeData.id);
+        
+        // Filter services based on store configuration
+        let availableServices = servicesData;
+        if (storeData.has_workshop === false) {
+          availableServices = availableServices.filter((s: any) => s.service_type !== 'workshop');
+        }
+        if (storeData.has_fitting === false) {
+          availableServices = availableServices.filter((s: any) => s.service_type !== 'fitting');
+        }
 
+        const filteredServices = serviceType 
+          ? availableServices.filter((s: any) => s.service_type === serviceType)
+          : availableServices;
+        
+        setServices(filteredServices);
+        
+        // Auto-select if only one service
+        if (filteredServices.length === 1) {
+          setSelectedService(filteredServices[0]);
+          setStep('date');
+        }
+      } catch (error) {
+        console.error('❌ Magasin non trouvé:', error);
+        alert('Magasin non trouvé');
+        navigate('/stores');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStore();
+  }, [storeSlug, serviceType, navigate]);
+
+  // Load availability for selected date
   useEffect(() => {
     if (selectedService && selectedDate) {
       loadAvailability();
     }
   }, [selectedService, selectedDate]);
 
-  const resolveStoreId = async () => {
-    if (!storeSlug) return;
+  // Prefetch month availability
+  useEffect(() => {
+    if (step === 'date' && selectedService && storeId) {
+      prefetchMonthAvailability();
+    }
+  }, [currentMonth, selectedService, step, storeId]);
+
+  const prefetchMonthAvailability = async () => {
+    if (!selectedService || !storeId) return;
+    
+    const days = getDaysInMonth().filter(day => {
+      const isPast = isBefore(day, startOfDay(new Date()));
+      const isSunday = day.getDay() === 0;
+      return !isPast && !isSunday;
+    });
     
     try {
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storeSlug);
+      const checks = await Promise.all(
+        days.map(async (day) => {
+          const dateStr = format(day, 'yyyy-MM-dd');
+          try {
+            const slots = await getAvailability(storeId, selectedService.id, dateStr);
+            return { 
+              date: dateStr, 
+              isFullyBooked: slots.length > 0 && slots.every(s => s.available === false) 
+            };
+          } catch {
+            return { date: dateStr, isFullyBooked: false };
+          }
+        })
+      );
       
-      let storeData;
-      if (isUUID) {
-        storeData = await getStoreById(storeSlug);
-      } else {
-        storeData = await getStoreBySlug(storeSlug);
-      }
-      setStoreId(storeData.id);
+      setFullyBookedDates(new Set(
+        checks.filter(c => c.isFullyBooked).map(c => c.date)
+      ));
     } catch (error) {
-      console.error('❌ Magasin non trouvé:', error);
-      alert('Magasin non trouvé');
-      navigate('/stores');
-    }
-  };
-
-  const loadStoreData = async () => {
-    setLoading(true);
-    try {
-      const [storeData, servicesData] = await Promise.all([
-        getStoreById(storeId!),
-        getStoreServices(storeId!),
-      ]);
-      setStore(storeData);
-      
-      // Filtrer les services selon la configuration du magasin
-      let availableServices = servicesData;
-      if (storeData.has_workshop === false) {
-        availableServices = availableServices.filter((s: any) => s.service_type !== 'workshop');
-      }
-      if (storeData.has_fitting === false) {
-        availableServices = availableServices.filter((s: any) => s.service_type !== 'fitting');
-      }
-
-      const filteredServices = serviceType 
-        ? availableServices.filter((s: any) => s.service_type === serviceType)
-        : availableServices;
-      
-      setServices(filteredServices);
-      
-      if (filteredServices.length === 1) {
-        setSelectedService(filteredServices[0]);
-        setStep('date');
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement:', error);
-    } finally {
-      setLoading(false);
+      console.error('Erreur prefetch disponibilités:', error);
     }
   };
 
   const loadAvailability = async () => {
-    if (!selectedService || !selectedDate) return;
+    if (!selectedService || !selectedDate || !storeId) return;
     
     setLoading(true);
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const slots = await getAvailability(storeId!, selectedService.id, dateStr);
+      const slots = await getAvailability(storeId, selectedService.id, dateStr);
       setAvailableSlots(slots);
 
-      // Mettre à jour les journées complètes
+      // Update fully booked dates
       setFullyBookedDates(prev => {
         const next = new Set(prev);
         if (slots.length > 0 && slots.every(slot => slot.available === false)) {
@@ -196,6 +247,8 @@ export default function ModernBookingPage() {
   };
 
   const handleSlotSelect = (slot: TimeSlot) => {
+    // Prevent selecting booked slots unless admin
+    if (!isAdmin && slot.available === false) return;
     setSelectedSlot(slot);
   };
 
@@ -203,6 +256,9 @@ export default function ModernBookingPage() {
     if (!selectedSlot) return;
     setStep('form');
   };
+
+  const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const validatePhone = (phone: string) => /^(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}$/.test(phone);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,8 +268,22 @@ export default function ModernBookingPage() {
       alert('Veuillez sélectionner un service et un créneau horaire.');
       return;
     }
+
+    // Validation
+    if (!validateEmail(formData.email)) {
+      alert('Format email invalide');
+      return;
+    }
+    if (!validatePhone(formData.phone)) {
+      alert('Format téléphone invalide (ex: 06 12 34 56 78)');
+      return;
+    }
     
     setSubmitting(true);
+    
+    // Status logic: confirmed if admin, pending otherwise
+    const targetStatus = isAdmin ? 'confirmed' : 'pending';
+    const source = isAdmin ? 'admin' : 'customer';
     
     try {
       const bookingData: CreateBookingData = {
@@ -225,6 +295,8 @@ export default function ModernBookingPage() {
         customer_lastname: formData.lastname,
         customer_email: formData.email,
         customer_phone: formData.phone,
+        status: targetStatus,
+        source: source,
         customer_data: {
           height: formData.height ? parseInt(formData.height) : undefined,
           weight: formData.weight ? parseInt(formData.weight) : undefined,
@@ -235,10 +307,13 @@ export default function ModernBookingPage() {
         },
       };
       
-      console.log('📤 Envoi de la réservation:', bookingData);
       const booking = await createBooking(bookingData);
-      console.log('✅ Réservation créée:', booking);
-      navigate(`/booking/${booking.booking_token}`);
+      
+      if (isAdmin) {
+        navigate('/admin/planning');
+      } else {
+        navigate(`/booking/${booking.booking_token}`);
+      }
     } catch (error: any) {
       console.error('❌ Erreur lors de la création de la réservation:', error);
       console.error('Détails:', error.response?.data || error.message);
@@ -246,6 +321,13 @@ export default function ModernBookingPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleBack = () => {
+    if (step === 'form' && Object.values(formData).some(v => v && v !== 'own' && v !== false)) {
+      if (!confirm('Voulez-vous vraiment quitter ? Les données saisies seront perdues.')) return;
+    }
+    navigate(-1);
   };
 
   const previousMonth = () => setCurrentMonth(prev => addMonths(prev, -1));
@@ -295,7 +377,7 @@ export default function ModernBookingPage() {
         <div className="container mx-auto px-4 flex items-center justify-between h-14">
           <div className="w-[180px] flex justify-start">
             <button
-              onClick={() => navigate(-1)}
+              onClick={handleBack}
               className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-white/20 transition-all text-white font-bold text-sm"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -355,7 +437,13 @@ export default function ModernBookingPage() {
             )}
 
             {/* Step Content */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative">
+              {isAdmin && (
+                <div className="absolute -top-3 -right-3 sm:top-2 sm:right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg z-50">
+                  ADMIN
+                </div>
+              )}
+              
               {step === 'service' && (
                 <div className="space-y-4">
                   <h2 className="text-xl font-extrabold text-[#142129]">Choisissez votre service</h2>
@@ -437,6 +525,9 @@ export default function ModernBookingPage() {
                         ))}
                       </div>
                       <div className="grid grid-cols-7 gap-1">
+                        {[...Array(((startOfMonth(currentMonth).getDay() + 6) % 7))].map((_, i) => (
+                          <div key={`empty-${i}`} className="aspect-square" />
+                        ))}
                         {getDaysInMonth().map((day, i) => {
                           const isPast = isBefore(day, startOfDay(new Date()));
                           const isSelected = selectedDate && isSameDay(day, selectedDate);
@@ -482,16 +573,18 @@ export default function ModernBookingPage() {
                         </div>
                       ) : (
                         <div className="grid grid-cols-3 gap-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                          {availableSlots.map((slot, i) => {
+                          {availableSlots
+                            .filter(slot => isAdmin || slot.available !== false)
+                            .map((slot, i) => {
                             const isBooked = slot.available === false;
                             return (
                               <button
                                 key={i}
-                                onClick={() => !isBooked && handleSlotSelect(slot)}
-                                disabled={isBooked}
+                                onClick={() => handleSlotSelect(slot)}
+                                disabled={!isAdmin && isBooked}
                                 className={`py-1.5 px-1 rounded-md text-xs font-medium transition-all
                                   ${isBooked
-                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed line-through'
+                                    ? 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed opacity-60'
                                     : selectedSlot === slot
                                       ? 'bg-[#005162] text-white shadow-sm'
                                       : 'bg-white border border-gray-200 text-gray-700 hover:border-[#005162] hover:text-[#005162]'
@@ -499,6 +592,7 @@ export default function ModernBookingPage() {
                                 `}
                               >
                                 {format(new Date(slot.start_datetime), 'HH:mm')}
+                                {isBooked && isAdmin && <span className="block text-[8px] font-bold">(Complet)</span>}
                               </button>
                             );
                           })}
@@ -597,7 +691,7 @@ export default function ModernBookingPage() {
                     />
 
                     <Input
-                      label="Téléphone *"
+                      label="Téléphone * (ex: 06 12 34 56 78)"
                       type="tel"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}

@@ -1,0 +1,72 @@
+elastic-agent:
+  web:
+    resources:
+      limits:
+        cpu: 2
+        memory: 1200Mi
+      requests:
+        cpu: 0.2
+        memory: 300Mi
+    tolerations:
+      - key: pool
+        operator: Equal
+        value: regular-pool-env 
+        effect: NoSchedule
+      - key: pool
+        operator: Equal
+        value: spot-pool-env
+        effect: NoSchedule
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: node_pool
+                  operator: In
+                  values:
+                    - regular-pool-env 
+                    - spot-pool-env
+  jobs:
+    resources:
+      limits:
+        cpu: 2
+        memory: 1000Mi
+      requests:
+        cpu: 0.2
+        memory: 300Mi
+    dnsConfig:
+      nameservers:
+        - 8.8.8.8
+    tolerations:
+      - key: pool
+        operator: Equal
+        value: regular-pool
+        effect: NoSchedule
+      - key: pool
+        operator: Equal
+        value: regular-pool-job
+        effect: NoSchedule
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: node_pool
+                  operator: In
+                  values:
+                    - regular-pool-job
+  ksm:
+    resources:
+      limits:
+        cpu: 2
+        memory: 1000Mi
+      requests:
+        cpu: 1m
+        memory: 300Mi
+    tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+      - key: node-role.kubernetes.io/master
+        effect: NoSchedule
+    strategy:
+      type: Recreate

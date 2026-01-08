@@ -1,0 +1,31 @@
+name: ${CONTAINERS_PREFIX:-booking}
+
+services:
+  node:
+    container_name: ${CONTAINERS_PREFIX:-booking}-node
+    image: europe-west1-docker.pkg.dev/avanis-infra-gke-dev/docker/node-22:1.2.1-dev
+    environment:
+      USER_ID: "${USER_ID}"
+      GROUP_ID: "${GROUP_ID}"
+      PHYSICAL_ENV: 'dev'
+      VITE_API_URL: http://booking.alltricks.fr.local/api/
+      AUTOSTART_APPS: false
+    volumes:
+      - ./:/var/www
+      - ./devops/supervisor/srv_backend.conf:/etc/supervisor/conf.d/srv_backend.conf:ro
+      - ./devops/supervisor/srv_frontend.conf:/etc/supervisor/conf.d/srv_frontend.conf:ro
+    networks:
+      default:
+        aliases:
+          - booking.alltricks.fr.local
+  postgres:
+    image: postgres:16.2-bookworm
+    container_name: ${CONTAINERS_PREFIX:-booking}-postgres
+    user: "${USER_ID}:${GROUP_ID}"
+    volumes:
+      - ./data/postgres/master:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: booking
+      TZ: 'Europe/Paris'
+      PGTZ: 'Europe/Paris'
+      PGDATA: /var/lib/postgresql/data/data

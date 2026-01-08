@@ -1,0 +1,7 @@
+nameOverride: ~
+fullnameOverride: ~
+
+snapshot:
+  name: projects/PROJECT/global/snapshots/SNAPSHOTNAME
+  size: 1Gi
+namespace: namespace

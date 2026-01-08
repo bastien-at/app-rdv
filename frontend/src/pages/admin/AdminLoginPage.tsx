@@ -24,6 +24,50 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
+
+  const getLatestVersion = (info: AppInfo | null) => {
+    if (!info) return null;
+    const versions = (info.changelog || []).map((c) => c.version).filter(Boolean);
+    if (versions.length === 0) return info.version || null;
+
+    const parse = (v: string) => v.split('.').map((x) => Number.parseInt(x, 10) || 0);
+    const cmp = (a: string, b: string) => {
+      const pa = parse(a);
+      const pb = parse(b);
+      const len = Math.max(pa.length, pb.length);
+      for (let i = 0; i < len; i++) {
+        const da = pa[i] ?? 0;
+        const db = pb[i] ?? 0;
+        if (da !== db) return da - db;
+      }
+      return 0;
+    };
+
+    return versions.sort(cmp).at(-1) || info.version || null;
+  };
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadAppInfo = async () => {
+      try {
+        const res = await fetch('/app-info.json', { cache: 'no-cache' });
+        if (!res.ok) return;
+        const data = (await res.json()) as AppInfo;
+        if (!isMounted) return;
+        if (data && typeof data.version === 'string') setAppInfo(data);
+      } catch {
+        // Ignore
+      }
+    };
+
+    loadAppInfo();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const [changelog, setChangelog] = useState<ChangelogData | null>(null);
 
@@ -167,6 +211,12 @@ export default function AdminLoginPage() {
               Me connecter
             </Button>
           </form>
+
+          {getLatestVersion(appInfo) ? (
+            <div className="mt-5 text-center text-xs text-gray-400">
+              Version {getLatestVersion(appInfo)}
+            </div>
+          ) : null}
         </Card>
 
         <div className="mt-4 text-xs text-gray-500">

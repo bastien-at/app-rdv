@@ -567,7 +567,7 @@ export const updateBookingStatus = async (
 
     const result = await query<Booking>(
       `UPDATE bookings 
-       SET status = $1, internal_notes = COALESCE($2, internal_notes)
+       SET status = $1, internal_notes = COALESCE($2, internal_notes), updated_at = NOW()
        WHERE id = $3
        RETURNING *`,
       [status, internal_notes || null, id],
@@ -581,9 +581,46 @@ export const updateBookingStatus = async (
       return;
     }
 
+    const booking = result.rows[0];
+
+    // Si le nouveau statut est "annulé", envoyer l'email d'annulation
+    if (status === 'cancelled') {
+      try {
+        const detailsResult = await query<BookingWithDetails>(
+          `SELECT 
+            b.*,
+            srv.name as service_name,
+            srv.service_type,
+            srv.price as service_price,
+            srv.duration_minutes as service_duration,
+            st.name as store_name,
+            st.address as store_address,
+            st.city as store_city,
+            st.postal_code as store_postal_code,
+            st.phone as store_phone,
+            st.email as store_email,
+            t.name as technician_name
+          FROM bookings b
+          JOIN services srv ON b.service_id = srv.id
+          JOIN stores st ON b.store_id = st.id
+          LEFT JOIN technicians t ON b.technician_id = t.id
+          WHERE b.id = $1`,
+          [id],
+        );
+
+        if (detailsResult.rows.length > 0) {
+          const { sendCancellationEmail } = require('../utils/email');
+          await sendCancellationEmail(detailsResult.rows[0]);
+        }
+      } catch (emailError) {
+        console.error('Erreur lors de l\'envoi de l\'email d\'annulation (admin):', emailError);
+        // On ne bloque pas la réponse si l'email échoue
+      }
+    }
+
     res.json({
       success: true,
-      data: result.rows[0],
+      data: booking,
       message: 'Statut mis à jour avec succès',
     });
   } catch (error) {
@@ -641,11 +678,79 @@ export const createAvailabilityBlock = async (
       reason,
       block_type,
       service_type,
+      quantity = 1,
+      cancel_conflicts = false,
     } = req.body;
 
+    const start = new Date(start_datetime);
+    const end = new Date(end_datetime);
+
+    // 1. Vérifier s'il y a des RDV confirmés sur ce créneau
+    const conflictResult = await query<BookingWithDetails>(
+      `SELECT 
+        b.*,
+        srv.name as service_name,
+        srv.service_type,
+        st.name as store_name,
+        st.email as store_email,
+        st.phone as store_phone
+      FROM bookings b
+      JOIN services srv ON b.service_id = srv.id
+      JOIN stores st ON b.store_id = st.id
+      WHERE b.store_id = $1 
+      AND b.status IN ('confirmed', 'pending')
+      AND b.start_datetime < $2 
+      AND b.end_datetime > $3`,
+      [store_id, end, start]
+    );
+
+    const conflictingBookings = conflictResult.rows;
+
+    // 2. S'il y a des conflits et que l'admin n'a pas explicitement demandé de les annuler
+    if (conflictingBookings.length > 0 && !cancel_conflicts) {
+      res.status(409).json({
+        success: false,
+        error: 'CONFLICTING_BOOKINGS',
+        conflicts: conflictingBookings.map(b => ({
+          id: b.id,
+          customer_name: `${b.customer_firstname} ${b.customer_lastname}`,
+          start_datetime: b.start_datetime,
+          service_name: b.service_name,
+          status: b.status
+        })),
+        message: `${conflictingBookings.length} RDV existant(s) sur ce créneau.`,
+      });
+      return;
+    }
+
+    // 3. Si cancel_conflicts est vrai, annuler les RDV
+    if (conflictingBookings.length > 0 && cancel_conflicts) {
+      const { sendCancellationEmail } = require('../utils/email');
+      
+      for (const booking of conflictingBookings) {
+        await query(
+          `UPDATE bookings 
+           SET status = 'cancelled', 
+               cancelled_at = NOW(), 
+               cancellation_reason = $1,
+               internal_notes = COALESCE(internal_notes, '') || '\nAnnulé automatiquement suite à un blocage : ' || $2
+           WHERE id = $3`,
+          ['Annulation automatique suite à une fermeture exceptionnelle / blocage.', reason || 'Blocage admin', booking.id]
+        );
+
+        // Envoyer l'email d'annulation
+        try {
+          await sendCancellationEmail(booking);
+        } catch (emailError) {
+          console.error(`Erreur envoi email annulation automatique pour RDV ${booking.id}:`, emailError);
+        }
+      }
+    }
+
+    // 4. Créer le blocage
     const result = await query(
-      `INSERT INTO availability_blocks (store_id, technician_id, start_datetime, end_datetime, reason, block_type, service_type)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO availability_blocks (store_id, technician_id, start_datetime, end_datetime, reason, block_type, service_type, quantity)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         store_id,
@@ -655,13 +760,16 @@ export const createAvailabilityBlock = async (
         reason || null,
         block_type || 'other',
         service_type || null,
+        quantity,
       ],
     );
 
     res.status(201).json({
       success: true,
       data: result.rows[0],
-      message: 'Blocage créé avec succès',
+      message: conflictingBookings.length > 0 
+        ? `Blocage créé et ${conflictingBookings.length} RDV annulé(s).` 
+        : 'Blocage créé avec succès',
     });
   } catch (error) {
     console.error('Erreur lors de la création du blocage:', error);

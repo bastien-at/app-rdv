@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "fullname" . }}
+  labels:
+    app: {{ template "name" . }}
+    {{- include "labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "name" . }}
+        {{- include "selectorLabels" . | nindent 8 }}
+        {{- include "customLabels" . | nindent 8 }}
+    spec:
+      volumes:
+        - name: nginx-conf-template
+          configMap:
+            name: {{ template "fullname" . }}
+            items:
+              - key: nginx-conf-template
+                path: nginx.conf.template
+      containers:
+        - name: nginx
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            {{- range $key, $value := .Values.targets }}
+            - name: {{ $key }}
+              containerPort: {{ $value.port.target }}
+            {{- end }}
+          volumeMounts:
+            - name: nginx-conf-template
+              mountPath: /etc/nginx/templates/
+          env:
+            - name: TZ
+              value: Europe/Paris
+            - name: NGINX_ENVSUBST_OUTPUT_DIR
+              value: /etc/nginx
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

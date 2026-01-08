@@ -1,0 +1,164 @@
+js_path "/etc/nginx/njs/";
+js_import onfly from onfly.js;
+
+upstream backend {
+    server ${UPSTREAM};
+}
+
+map $uri $storage {
+    ^/(s-[^/]+)/  $1;
+    default       's-default';
+}
+
+# Generate from helm command :
+server {
+    listen 80 default_server;
+    server_name _;
+    client_body_buffer_size 10M;
+    client_max_body_size 10M;
+    subrequest_output_buffer_size 10M;
+    access_log ${ACCESS_LOG_FILE};
+    error_log ${ERROR_LOG_FILE};
+
+    location /health {
+        proxy_pass http://backend;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $server_name;
+    }
+
+    # Public presets
+    location ~ ^/(s-[^/]+/)?(?<gcs_pr_folder>[\w-]+/)?(?<preset>${PUBLIC_PRESETS})/(?<remaining_uri>.*) {
+        proxy_pass http://backend/insecure/pr:$preset/plain/$storage/$gcs_pr_folder$remaining_uri${PUBLIC_PRESETS_IMAGE_SUFFIX}$is_args$args;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $server_name;
+    }
+
+    # Path presets
+    location ~ ^/(s-[^/]+/)?(?<gcs_pr_folder>[\w-]+/)?(?<preset>${PATH_PRESETS_0_PRESET})/(?<remaining_uri>${PATH_PRESETS_0_PATH}/.*) {
+        proxy_pass http://backend/insecure/pr:$preset/plain/$storage/$gcs_pr_folder$remaining_uri$is_args$args;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $server_name;
+    }
+
+    location ~ ^/(s-[^/]+/)?(?<gcs_pr_folder>[\w-]+/)?(?<preset>${PATH_PRESETS_1_PRESET})/(?<remaining_uri>${PATH_PRESETS_1_PATH}/.*) {
+        proxy_pass http://backend/insecure/pr:$preset/plain/$storage/$gcs_pr_folder$remaining_uri$is_args$args;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $server_name;
+    }
+
+    location ~ ^/(s-[^/]+/)?(?<gcs_pr_folder>[\w-]+/)?(?<preset>${PATH_PRESETS_2_PRESET})/(?<remaining_uri>${PATH_PRESETS_2_PATH}/.*) {
+        proxy_pass http://backend/insecure/pr:$preset/plain/$storage/$gcs_pr_folder$remaining_uri$is_args$args;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $server_name;
+    }
+
+    location ~ ^/(s-[^/]+/)?(?<gcs_pr_folder>[\w-]+/)?(?<preset>${PATH_PRESETS_3_PRESET})/(?<remaining_uri>${PATH_PRESETS_3_PATH}/.*) {
+        proxy_pass http://backend/insecure/pr:$preset/plain/$storage/$gcs_pr_folder$remaining_uri$is_args$args;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $server_name;
+    }
+
+    location ~ ^/(s-[^/]+/)?(?<gcs_pr_folder>[\w-]+/)?(?<preset>${PATH_PRESETS_4_PRESET})/(?<remaining_uri>${PATH_PRESETS_4_PATH}/.*) {
+        proxy_pass http://backend/insecure/pr:$preset/plain/$storage/$gcs_pr_folder$remaining_uri$is_args$args;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $server_name;
+    }
+
+    location ~ ^/(s-[^/]+/)?(?<gcs_pr_folder>[\w-]+/)?(?<preset>${PATH_PRESETS_5_PRESET})/(?<remaining_uri>${PATH_PRESETS_5_PATH}/.*) {
+        proxy_pass http://backend/insecure/pr:$preset/plain/$storage/$gcs_pr_folder$remaining_uri$is_args$args;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $server_name;
+    }
+
+    location ~ ^/(s-[^/]+/)?(?<gcs_pr_folder>[\w-]+/)?(?<preset>${PATH_PRESETS_6_PRESET})/(?<remaining_uri>${PATH_PRESETS_6_PATH}/.*) {
+        proxy_pass http://backend/insecure/pr:$preset/plain/$storage/$gcs_pr_folder$remaining_uri$is_args$args;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $server_name;
+    }
+
+    location ~ ^/(s-[^/]+/)?(?<gcs_pr_folder>[\w-]+/)?(?<preset>${PATH_PRESETS_7_PRESET})/(?<remaining_uri>${PATH_PRESETS_7_PATH}/.*) {
+        proxy_pass http://backend/insecure/pr:$preset/plain/$storage/$gcs_pr_folder$remaining_uri$is_args$args;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $server_name;
+    }
+
+    location ~ ^/(s-[^/]+/)?(?<gcs_pr_folder>[\w-]+/)?(?<preset>${PATH_PRESETS_8_PRESET})/(?<remaining_uri>${PATH_PRESETS_8_PATH}/.*) {
+        proxy_pass http://backend/insecure/pr:$preset/plain/$storage/$gcs_pr_folder$remaining_uri$is_args$args;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $server_name;
+    }
+
+    location ~ ^/(s-[^/]+/)?(?<gcs_pr_folder>[\w-]+/)?(?<preset>${PATH_PRESETS_9_PRESET})/(?<remaining_uri>${PATH_PRESETS_9_PATH}/.*) {
+        proxy_pass http://backend/insecure/pr:$preset/plain/$storage/$gcs_pr_folder$remaining_uri$is_args$args;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $server_name;
+    }
+    # end Path presets
+
+    # Private presets
+    location ~ ^/(s-[^/]+/)?(?<gcs_pr_folder>[\w-]+/)?(?<preset>${PRIVATE_PRESETS})/${PRIVATE_KEY}/(?<remaining_uri>.*) {
+        proxy_pass http://backend/insecure/pr:$preset/plain/$storage/$gcs_pr_folder$remaining_uri$is_args$args;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $server_name;
+        add_header Cache-Control no-store;
+    }
+
+    # Image resize onfly
+    location ~ /onfly/${PRIVATE_KEY}/(?<remaining_uri>.*) {
+        js_content onfly.handler;
+    }
+
+    # Custom preset
+    location ~ ^/custom/${PRIVATE_KEY}/(?<remaining_uri>.*) {
+        proxy_pass http://backend/insecure/$remaining_uri;
+        proxy_redirect off;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Host $server_name;
+        add_header Cache-Control no-store;
+    }
+
+    location / {
+        return 404;
+    }
+}

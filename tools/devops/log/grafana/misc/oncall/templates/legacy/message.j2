@@ -1,0 +1,11 @@
+{{- payload.message }}
+{%- if "status" in payload %}
+**Status**: {{ payload.status }}
+{% endif -%}
+**Labels:** {% for k, v in payload["labels"].items() %}
+*{{ k }}*: {{ v }}{% endfor %}
+**Annotations:** 
+{%- for k, v in payload.get("annotations", {}).items() %}
+{#- render annotation as markdown url if it starts with http #}
+*{{ k }}*: {% if v.startswith("http") %} [here]({{v}}){% else %} {{v}} {% endif -%}
+{% endfor %}

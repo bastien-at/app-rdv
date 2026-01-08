@@ -1,0 +1,26 @@
+version: "3.7"
+
+services:
+  mysql:
+    container_name: ${CONTAINERS_PREFIX:-downloader}-mysql
+    build:
+      context: mysql
+    volumes:
+      - /usr/share/downloader/data:/usr/share/downloader/data
+      - ./mysql/avanis-infra-gke-dev.json:/home/docker/avanis-infra-gke-dev.json
+    environment:
+      TZ: 'Europe/Paris'
+    working_dir: /home/docker
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    restart: always
+    cap_add:
+      - NET_ADMIN
+
+networks:
+  default:
+    name: ${CONTAINERS_PREFIX:-downloader}_default
+    driver_opts:
+      com.docker.network.driver.mtu: ${DOCKER_DEFAULT_MTU:-1500}

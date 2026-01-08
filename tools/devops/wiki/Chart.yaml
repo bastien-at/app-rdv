@@ -1,0 +1,17 @@
+apiVersion: v2
+name: docs
+description: A Helm chart for Alltricks wiki documentation
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+dependencies:
+  - name: wiki
+    version: 2.2.17
+    repository: https://charts.js.wiki/
+    alias: requarks
+    condition: wikijs.enabled
+  - name: kroki
+    version: 5.6.0
+    repository: https://cowboysysop.github.io/charts/
+    condition: kroki.enabled

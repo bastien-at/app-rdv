@@ -1,0 +1,2 @@
+#!/bin/bash
+XDEBUG_SESSION=1 php "$@"
