@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Bike } from 'lucide-react';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import Card from '../../components/Card';
 import { adminLogin } from '../../services/api';
 
-interface AppInfo {
-  version: string;
-  changelog?: Array<{
-    version: string;
-    date?: string;
-    changes?: string[];
-  }>;
-}
+type ChangelogEntry = {
+  hash: string;
+  author: string;
+  date: string;
+  subject: string;
+};
+
+type ChangelogData = {
+  generatedAt: string;
+  entries: ChangelogEntry[];
+};
 
 export default function AdminLoginPage() {
   const navigate = useNavigate();
@@ -64,6 +66,33 @@ export default function AdminLoginPage() {
 
     return () => {
       isMounted = false;
+    };
+  }, []);
+
+  const [changelog, setChangelog] = useState<ChangelogData | null>(null);
+
+  const appVersion = (import.meta.env.VITE_APP_VERSION as string | undefined) || '';
+  const appGitSha = (import.meta.env.VITE_APP_GIT_SHA as string | undefined) || '';
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const load = async () => {
+      try {
+        const res = await fetch('/changelog.json', { cache: 'no-store' });
+        if (!res.ok) return;
+        const json = (await res.json()) as ChangelogData;
+        if (!cancelled) {
+          setChangelog(json);
+        }
+      } catch {
+        // ignore
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
     };
   }, []);
 
@@ -190,7 +219,38 @@ export default function AdminLoginPage() {
           ) : null}
         </Card>
 
-      
+        <div className="mt-4 text-xs text-gray-500">
+          <div className="flex items-center justify-between">
+            <span>
+              Version {appVersion || '—'}
+              {appGitSha ? ` (${appGitSha.slice(0, 7)})` : ''}
+            </span>
+            {changelog?.generatedAt ? (
+              <span>
+                Changelog {new Date(changelog.generatedAt).toLocaleString()}
+              </span>
+            ) : null}
+          </div>
+
+          {changelog?.entries?.length ? (
+            <div className="mt-2 border border-gray-200 bg-white rounded-lg p-3 max-h-40 overflow-auto">
+              <div className="font-medium text-gray-700 mb-2">Derniers changements</div>
+              <div className="space-y-2">
+                {changelog.entries.slice(0, 10).map((entry) => (
+                  <div key={entry.hash} className="text-gray-600">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="truncate">{entry.subject}</span>
+                      <span className="shrink-0">{entry.hash.slice(0, 7)}</span>
+                    </div>
+                    <div className="text-[11px] text-gray-400">
+                      {new Date(entry.date).toLocaleString()} · {entry.author}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
     </div>
   );
