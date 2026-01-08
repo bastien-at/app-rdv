@@ -37,15 +37,25 @@ export const getStoreBySlug = async (
   try {
     const { slug } = req.params;
     
-    // Recherche simple par ville (insensible à la casse)
+    const normalizedSlug = slug.replace(/-/g, ' ');
+    
     const result = await query<Store>(
-      `SELECT * FROM stores 
-       WHERE LOWER(city) = LOWER($1)
-       AND active = true`,
-      [slug]
+      `SELECT * FROM stores WHERE active = true`
     );
     
-    if (result.rows.length === 0) {
+    const normalize = (str: string) => 
+      str.toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/-/g, ' ');
+    
+    const store = result.rows.find(s => {
+      const cityNorm = normalize(s.city);
+      const slugNorm = normalize(normalizedSlug);
+      return cityNorm === slugNorm;
+    });
+    
+    if (!store) {
       res.status(404).json({
         success: false,
         error: 'Magasin non trouvé',
@@ -55,7 +65,7 @@ export const getStoreBySlug = async (
     
     res.json({
       success: true,
-      data: result.rows[0],
+      data: store,
     });
   } catch (error) {
     console.error('Erreur lors de la récupération du magasin par slug:', error);

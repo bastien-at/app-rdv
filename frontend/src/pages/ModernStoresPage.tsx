@@ -145,6 +145,10 @@ export default function ModernStoresPage() {
 
                       <Button
                         fullWidth
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/stores/${cityToSlug(store.city)}`);
+                        }}
                         className="bg-[#005162] text-white hover:bg-[#003a46] shadow-none hover:shadow-md rounded-full py-3 h-auto font-bold text-[16px]"
                       >
                         Réserver
