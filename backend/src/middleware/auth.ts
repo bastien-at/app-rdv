@@ -74,7 +74,7 @@ export const requireStoreAccess = (
   res: Response,
   next: NextFunction
 ): void => {
-  const storeId = req.params.storeId || req.params.id || req.body.store_id;
+  const storeId = req.params.store_id || req.params.storeId || req.params.id || req.body.store_id;
   
   // Debug logs
   console.log('requireStoreAccess Debug:', {

@@ -37,8 +37,9 @@ export const calculateAvailableSlots = async (
   const dayName = format(date, 'EEEE').toLowerCase() as keyof typeof store.opening_hours;
   const daySchedule: DaySchedule = store.opening_hours[dayName];
   
-  if (!daySchedule || daySchedule.closed) {
-    return []; // Magasin fermé ce jour
+  // Bloquer systématiquement les dimanches
+  if (date.getDay() === 0 || !daySchedule || daySchedule.closed) {
+    return []; // Magasin fermé ou dimanche
   }
   
   // 4. Générer tous les créneaux possibles
@@ -109,7 +110,8 @@ export const calculateAvailableSlots = async (
   
   // 8. Filtrer les créneaux disponibles - VERSION AVEC CAPACITÉ PAR TYPE DE SERVICE
   const workshopCapacity = store.workshop_capacity || 1;
-  const capacity = service.service_type === 'workshop' ? workshopCapacity : 1; // Pour le fitting, on garde 1 pour l'instant
+  const fittingCapacity = store.fitting_capacity || 1;
+  const capacity = service.service_type === 'workshop' ? workshopCapacity : fittingCapacity;
 
   const availableSlots = allSlots.map(slot => {
     const slotStart = new Date(slot.start_datetime);

@@ -1,6 +1,6 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Search, Plus, Edit2, Trash2, Mail, Phone, Calendar, X, Check } from 'lucide-react';
+import { Users, Search, Plus, Edit2, Trash2, Mail, Phone, Calendar, X, Check, RotateCcw } from 'lucide-react';
 import AdminLayout from '../../components/admin/AdminLayout';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
@@ -27,6 +27,7 @@ export default function AdminCustomerDirectoryPage() {
   const navigate = useNavigate();
   const [stores, setStores] = useState<Store[]>([]);
   const [selectedStore, setSelectedStore] = useState<string>('');
+  const [adminStoreId, setAdminStoreId] = useState<string | null>(null);
   const [customers, setCustomers] = useState<PaginatedResponse<CustomerDirectory>>({
     data: [],
     total: 0,
@@ -76,19 +77,23 @@ export default function AdminCustomerDirectoryPage() {
       
       // Récupérer le store_id de l'admin connecté via le token
       const token = localStorage.getItem('admin_token');
-      let adminStoreId = null;
+      let currentTokenStoreId = null;
       if (token) {
         const decoded = parseJwt(token);
         if (decoded && decoded.store_id) {
-          adminStoreId = decoded.store_id;
+          currentTokenStoreId = decoded.store_id;
+          setAdminStoreId(currentTokenStoreId);
         }
       }
 
-      // Pré-sélectionner le magasin : soit celui de l'admin, soit le premier de la liste, soit garder l'actuel
-      if (adminStoreId) {
-        setSelectedStore(adminStoreId);
-      } else if (storeData.length > 0 && !selectedStore) {
-        setSelectedStore(storeData[0].id);
+      // Pré-sélectionner le magasin
+      // Utilise la valeur directe du token si disponible, sinon l'état existant, sinon le premier magasin
+      const effectiveStoreId = currentTokenStoreId || adminStoreId || (storeData.length > 0 ? storeData[0].id : '');
+      
+      console.log('loadStores: ID magasin effectif pour sélection:', effectiveStoreId);
+      
+      if (effectiveStoreId && !selectedStore) {
+        setSelectedStore(effectiveStoreId);
       }
     } catch (error) {
       console.error('Erreur chargement magasins:', error);
@@ -97,8 +102,12 @@ export default function AdminCustomerDirectoryPage() {
   };
 
   const loadCustomers = async () => {
-    if (!selectedStore) return;
+    if (!selectedStore) {
+      console.log('loadCustomers: Aucun magasin sélectionné');
+      return;
+    }
     
+    console.log('loadCustomers: Chargement pour le magasin', selectedStore);
     setLoading(true);
     try {
       const params: any = {
@@ -111,10 +120,10 @@ export default function AdminCustomerDirectoryPage() {
       }
 
       const customerData = await getCustomers(selectedStore, params);
-      console.log('Données clients reçues:', customerData);
+      console.log('loadCustomers: Données reçues:', customerData);
       setCustomers(customerData);
     } catch (error) {
-      console.error('Erreur chargement clients:', error);
+      console.error('loadCustomers: Erreur:');
       alert('Erreur lors du chargement des clients');
     } finally {
       setLoading(false);
@@ -220,7 +229,7 @@ export default function AdminCustomerDirectoryPage() {
   if (loading && (!customers?.data || customers.data.length === 0)) {
     return (
       <AdminLayout>
-        <div className="flex items-center justify-center h-full">
+        <div className="flex items-center justify-center h-full min-h-[400px]">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4" />
             <p className="text-gray-600">Chargement des clients...</p>
@@ -246,18 +255,23 @@ export default function AdminCustomerDirectoryPage() {
             </div>
           </div>
           <div className="flex gap-2">
-            <select
-              value={selectedStore}
-              onChange={(e) => setSelectedStore(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Sélectionner un magasin</option>
-              {stores.map(store => (
-                <option key={store.id} value={store.id}>
-                  {store.name} ({store.city})
-                </option>
-              ))}
-            </select>
+            {!adminStoreId && (
+              <select
+                value={selectedStore}
+                onChange={(e) => setSelectedStore(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Sélectionner un magasin</option>
+                {stores.map(store => (
+                  <option key={store.id} value={store.id}>
+                    {store.name} ({store.city})
+                  </option>
+                ))}
+              </select>
+            )}
+            <Button onClick={loadCustomers} variant="ghost" title="Rafraîchir">
+              <RotateCcw className="h-4 w-4" />
+            </Button>
             <Button onClick={openCreateModal} disabled={!selectedStore}>
               <Plus className="h-4 w-4 mr-2" />
               Nouveau client

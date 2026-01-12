@@ -183,15 +183,17 @@ export default function AvailabilityManagementPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Erreur API création blocage');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Erreur API création blocage:', errorData);
+        throw new Error(errorData.error || errorData.message || 'Erreur API création blocage');
       }
 
       setShowAddModal(false);
       resetForm();
       await loadBlocks();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur création blocage:', error);
-      alert('Erreur lors de la création du blocage');
+      alert(error.message || 'Erreur lors de la création du blocage');
     }
   };
 

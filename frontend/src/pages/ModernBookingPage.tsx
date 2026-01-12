@@ -254,7 +254,15 @@ export default function ModernBookingPage() {
   const getDaysInMonth = () => {
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
-    return eachDayOfInterval({ start, end });
+    const days = eachDayOfInterval({ start, end });
+    
+    // Calculer le décalage pour le premier jour du mois (Lundi = 0, ..., Dimanche = 6)
+    // getDay() renvoie 0 pour Dimanche, 1 pour Lundi, etc.
+    // On veut Lundi en premier, donc on ajuste : (day + 6) % 7
+    const firstDayOfWeek = (start.getDay() + 6) % 7;
+    const padding = Array(firstDayOfWeek).fill(null);
+    
+    return [...padding, ...days];
   };
 
   if (!store) {
@@ -438,6 +446,9 @@ export default function ModernBookingPage() {
                       </div>
                       <div className="grid grid-cols-7 gap-1">
                         {getDaysInMonth().map((day, i) => {
+                          if (!day) {
+                            return <div key={`empty-${i}`} className="aspect-square" />;
+                          }
                           const isPast = isBefore(day, startOfDay(new Date()));
                           const isSelected = selectedDate && isSameDay(day, selectedDate);
                           const isCurrentDay = isToday(day);
@@ -523,12 +534,6 @@ export default function ModernBookingPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-xl font-extrabold text-[#142129]">Vos informations</h2>
-                    <button
-                      onClick={() => setStep('date')}
-                      className="text-xs text-[#005162] font-semibold hover:underline"
-                    >
-                      Modifier
-                    </button>
                   </div>
 
                   {isAdmin && (

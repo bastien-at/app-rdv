@@ -6,7 +6,7 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import Button from './Button';
 import { Booking, Service, Store } from '../types';
-import { 
+import api, { 
   adminConfirmBooking, 
   AdminConfirmBookingPayload, 
   getStoreServices, 
@@ -151,17 +151,35 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
     setInspectionLoading(true);
     setShowInspectionReport(true);
     try {
+      // Charger l'état des lieux (bike_inspections)
       const inspection = await getInspectionByBookingApi(booking.id);
+      console.log('Inspection loaded for PV:', inspection);
       if (inspection) {
         setInspectionComments(inspection.comments || '');
         if (inspection.photos && Array.isArray(inspection.photos)) {
           setInspectionPhotos(
-            inspection.photos.map((p: any) => ({ id: String(p.id), photo_url: p.photo_url }))
+            inspection.photos.map((p: any) => ({ 
+              id: String(p.id), 
+              photo_url: p.photo_url 
+            }))
           );
         }
       }
+
+      // Charger aussi le PV de réception (reception_reports) s'il existe déjà
+      try {
+        const { data } = await api.get(`/bookings/${booking.id}/reception-report`, {
+          headers: { Authorization: `Bearer ${getAdminToken()}` }
+        });
+        if (data?.success && data?.data) {
+          setReportNotes(data.data.work_performed || '');
+        }
+      } catch (err) {
+        // 404 est normal si aucun PV n'existe encore
+        console.log('Aucun PV de réception existant pour cette réservation');
+      }
     } catch (error) {
-      console.error("Erreur lors du chargement de l'inspection:", error);
+      console.error("Erreur lors du chargement des données pour le PV:", error);
     } finally {
       setInspectionLoading(false);
     }

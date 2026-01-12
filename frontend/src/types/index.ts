@@ -13,6 +13,7 @@ export interface Store {
   has_workshop?: boolean;
   has_fitting?: boolean;
   workshop_capacity?: number;
+  fitting_capacity?: number;
 }
 
 export interface OpeningHours {
@@ -190,6 +191,8 @@ export interface CreateStoreData {
   active?: boolean;
   has_workshop?: boolean;
   has_fitting?: boolean;
+  workshop_capacity?: number;
+  fitting_capacity?: number;
 }
 
 export interface ApiResponse<T = any> {

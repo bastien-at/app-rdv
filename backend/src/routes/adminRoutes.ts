@@ -19,6 +19,7 @@ import {
   saveReceptionReport,
 } from '../controllers/adminController';
 import {
+  getStoreById,
   createStore,
   updateStore,
   deleteStore,
@@ -62,7 +63,7 @@ router.post('/bookings/:id/reception-report', saveReceptionReport);
 router.get('/stores/:storeId/availability-blocks', requireStoreAccess, getStoreAvailabilityBlocks);
 
 // POST /api/admin/availability-blocks - Créer un blocage
-router.post('/availability-blocks', validateCreateBlock, createAvailabilityBlock);
+router.post('/availability-blocks', requireStoreAccess, validateCreateBlock, createAvailabilityBlock);
 
 // DELETE /api/admin/availability-blocks/:id - Supprimer un blocage
 router.delete('/availability-blocks/:id', deleteAvailabilityBlock);
@@ -70,6 +71,9 @@ router.delete('/availability-blocks/:id', deleteAvailabilityBlock);
 // Routes super admin uniquement
 // GET /api/admin/admins - Liste tous les administrateurs
 router.get('/admins', requireSuperAdmin, getAllAdmins);
+
+// GET /api/admin/stores/:id - Récupérer les détails d'un magasin
+router.get('/stores/:id', requireStoreAccess, getStoreById);
 
 // POST /api/admin/admins - Créer un administrateur
 router.post('/admins', requireSuperAdmin, createAdmin);

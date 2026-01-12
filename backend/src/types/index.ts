@@ -15,6 +15,7 @@ export interface Store {
   has_workshop?: boolean;
   has_fitting?: boolean;
   workshop_capacity?: number;
+  fitting_capacity?: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -260,6 +261,7 @@ export interface CreateStoreData {
   has_workshop?: boolean;
   has_fitting?: boolean;
   workshop_capacity?: number;
+  fitting_capacity?: number;
 }
 
 export interface UpdateStoreData {
@@ -276,6 +278,7 @@ export interface UpdateStoreData {
   has_workshop?: boolean;
   has_fitting?: boolean;
   workshop_capacity?: number;
+  fitting_capacity?: number;
 }
 
 export interface BookingStats {

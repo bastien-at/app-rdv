@@ -17,13 +17,13 @@ export const getCustomers = async (
   res: Response
 ): Promise<void> => {
   try {
-    const { store_id } = req.params;
+    const store_id = req.params.store_id || req.params.storeId;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
     const search = req.query.search as string || '';
     const offset = (page - 1) * limit;
 
-    let whereClause = 'WHERE cd.store_id = $1 AND cd.active = true';
+    let whereClause = 'WHERE cd.store_id = $1';
     const queryParams: any[] = [store_id];
     let paramIndex = 2;
 
