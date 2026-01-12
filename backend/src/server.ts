@@ -74,7 +74,7 @@ app.use(cors({
 // Rate limiting (sauf pour login)
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 1000, // Augmenté à 1000 pour éviter les 429 en admin
+  max: 100, // Limite de 100 requêtes par IP
   message: 'Trop de requêtes, veuillez réessayer plus tard',
   skip: (req) => req.path === '/api/admin/login'
 });
