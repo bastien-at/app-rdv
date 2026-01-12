@@ -1,0 +1,89 @@
+#!/bin/bash
+
+# Active logs
+if [[ "$DEBUG_MODE" ]] && [[ "$DEBUG_MODE" != "0" ]]; then
+  exec 1>/tmp/docker-auto-update-hosts.log 2>&1
+fi
+
+INTERVAL=10
+HOST_FILE=/tmp/hosts
+TMP_HOST_FILE=/tmp/hosts.tmp
+PREDEFINED_HOST_FILE=/tmp/predefined_hosts
+HOST_COMMENT_CLEANER="# Set by .+dns"
+HOST_COMMENT="# Set by avanis dns (container $(hostname)), started at"
+HOST_COMMENT_CONTAINER_DETECTOR="# Set by .+dns \(container \K([a-z0-9]+)"
+ALIAS_REGEX_SUPPORT="^(alltricks_.+)|(.+\..+)$"
+ALIAS_REGEX_TO_HOST="^NOT_USED_NOW$"
+
+if [[ "$1" = "clean" ]]; then
+    grep -v "${HOST_COMMENT}" ${HOST_FILE} > ${TMP_HOST_FILE}
+    cp ${TMP_HOST_FILE} ${HOST_FILE}
+    exit 0
+fi
+
+echo "" > ${TMP_HOST_FILE}.prev
+
+while true; do
+    while read -r id; do
+        if docker container inspect -f '{{.State.Running}}' $id | grep "true" > /dev/null 2>&1; then
+            echo "Another avanis dns is runnning (container $id), do nothing"
+            sleep $INTERVAL
+            continue 2
+        fi
+    done < <(cat ${HOST_FILE} | grep -P -o "$HOST_COMMENT_CONTAINER_DETECTOR" | grep -v "$(hostname)" | uniq)
+
+    echo "Start analyse"
+    rm ${TMP_HOST_FILE} 2>/dev/null
+    cat ${HOST_FILE} | grep -E -v "${HOST_COMMENT_CLEANER}" > ${TMP_HOST_FILE}
+    sed -E "s~\$~  ${HOST_COMMENT}~" /etc/predefined_hosts >> ${TMP_HOST_FILE}
+    sed -E "s~\$~  ${HOST_COMMENT}~" ${PREDEFINED_HOST_FILE} >> ${TMP_HOST_FILE}
+
+    # Detect new and update
+    while read -r line; do
+        name=${line##* }
+        started=$(docker inspect --format='{{.State.StartedAt}}' "$name")
+
+        networks=$(docker inspect --format='{{range $index,$element := .NetworkSettings.Networks}}{{$index}} {{end}}' $name)
+        read -ra foo <<< "$networks"
+        for i in "${foo[@]}"; do
+            ip=$(docker inspect --format '{{index . "NetworkSettings" "Networks" "'$i'" "IPAddress"}}' $name)
+
+            echo "  Detect container $name : $ip"
+            echo "$ip $name.local  $HOST_COMMENT $started" >> ${TMP_HOST_FILE}
+
+            # Support alias is not
+            aliases=$(docker inspect --format='{{range $index,$element := index . "NetworkSettings" "Networks" "'$i'" "Aliases"}}{{$element}} {{end}}' $name)
+            echo "    Detect aliases $aliases"
+            read -ra bar <<< "$aliases"
+            for j in "${bar[@]}"; do
+                if [[ $j =~ $ALIAS_REGEX_TO_HOST ]]; then
+                    echo "    Add alias $j on 127.0.0.1"
+                    echo "127.0.0.1 $j  $HOST_COMMENT $started" >> ${TMP_HOST_FILE}
+                elif [[ $j =~ $ALIAS_REGEX_SUPPORT ]]; then
+                    echo "    Add alias $j"
+                    echo "$ip $j  $HOST_COMMENT $started" >> ${TMP_HOST_FILE}
+                fi
+            done
+        done
+    done < <(docker ps | tail -n +2)
+
+    if ! diff ${TMP_HOST_FILE} ${TMP_HOST_FILE}.prev > /dev/null; then
+        echo "  Copy new file"
+        cat ${TMP_HOST_FILE} > ${HOST_FILE}
+
+        # Add host.docker.internal on each container
+        while read -r line; do
+            name=${line##* }
+            echo "  Add host.docker.internal on $name container"
+            docker exec -u root "$name" sh -c "sed '/host.docker.internal/d' /etc/hosts > /etc/hosts.new && \
+              cp /etc/hosts.new /etc/hosts && \
+              rm /etc/hosts.new && \
+              echo '$(docker inspect --format='{{range $index,$element := .NetworkSettings.Networks}}{{.Gateway}}{{end}}' "$name" | head -n1) host.docker.internal  $HOST_COMMENT' >> /etc/hosts"
+        done < <(docker ps | tail -n +2)
+    else
+        echo "  No changes"
+    fi
+    cp ${TMP_HOST_FILE} ${TMP_HOST_FILE}.prev
+
+    sleep $INTERVAL
+done

@@ -1,0 +1,3 @@
+{%- set alert = payload.alerts[0] %}
+{%- set labels = alert.get("labels", {}) %}
+{{ alert.status == "resolved" }}

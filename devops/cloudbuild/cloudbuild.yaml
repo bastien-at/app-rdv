@@ -1,0 +1,46 @@
+steps:
+  - id: 'get-all-apps-secrets'
+    name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        gcloud --project avanis-infra-gke secrets versions access latest --secret=alltricks-booking > backend/.env
+
+  - id: "app"
+    name: gcr.io/kaniko-project/executor:v1.6.0-debug
+    entrypoint: /busybox/sh
+    args:
+      - '-c'
+      - |
+        executor \
+          --destination=${_CONTAINER_REGISTRY_URL}:build-${COMMIT_SHA} \
+          --dockerfile=devops/docker/Dockerfile \
+          --build-arg=_COMMIT_SHA=${COMMIT_SHA} \
+          --build-arg=_PHYSICAL_ENV \
+          --build-arg=_GITHUB_TOKEN \
+          --single-snapshot \
+          --snapshotMode=time \
+          --use-new-run
+
+options:
+  env:
+    - _PHYSICAL_ENV=$_PHYSICAL_ENV
+    - PROJECT_ID=$PROJECT_ID
+    - REPO_NAME=$REPO_NAME
+    - COMMIT_SHA=$COMMIT_SHA
+    - IMAGE_TAG=$_IMAGE_TAG
+    - _GITHUB_TOKEN=$_GITHUB_TOKEN
+    - BUILD_ID=$BUILD_ID
+    - TAG_NAME=$TAG_NAME
+
+substitutions:
+  _PHYSICAL_ENV: "prod"
+  _CONTAINER_REGISTRY_URL: 'europe-west1-docker.pkg.dev/${PROJECT_ID}/docker/${REPO_NAME}'
+
+timeout: '3000s'
+
+tags:
+  - 'cloudbuild'
+  - 'alltricks'
+  - 'booking'

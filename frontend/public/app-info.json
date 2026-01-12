@@ -1,0 +1,38 @@
+{
+  "version": "1.3.0",
+  "changelog": [
+    {
+      "version": "1.3.0",
+      "date": "2026-01-02",
+      "changes": [
+        "Sélecteur de quantité de techniciens pour les blocages",
+        "Migration SQL pour la colonne quantity dans les blocages",
+        "Adaptation dynamique de la capacité selon le type de service"
+      ]
+    },
+    {
+      "version": "1.2.0",
+      "date": "2026-01-02",
+      "changes": [
+        "Gestion des capacités multiples par créneau",
+        "Pop-in de choix de prestation sur le planning",
+        "Amélioration de la lisibilité des heures"
+      ]
+    },
+    {
+      "version": "1.1.0",
+      "date": "2026-01-02",
+      "changes": [
+        "Affichage des notes internes dans le drawer"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2025-12-30",
+      "changes": [
+        "Initialisation de l'application",
+        "Espace administration"
+      ]
+    }
+  ]
+}

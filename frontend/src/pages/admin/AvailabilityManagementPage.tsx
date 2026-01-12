@@ -13,6 +13,8 @@ import { getAdminToken } from '../../services/api';
 interface Store {
   id: string;
   name: string;
+  workshop_capacity?: number;
+  fitting_capacity?: number;
   opening_hours: {
     [key: string]: {
       open: string;
@@ -53,6 +55,7 @@ export default function AvailabilityManagementPage() {
     reason: '',
     block_type: 'closure' as const,
     service_type: null as 'fitting' | 'workshop' | null,
+    quantity: 1,
   });
 
   // Fonction utilitaire pour décoder le JWT
@@ -158,18 +161,20 @@ export default function AvailabilityManagementPage() {
     }
   };
 
-  const handleAddBlock = async () => {
+  const handleAddBlock = async (cancelConflicts: boolean = false) => {
     try {
       const start_datetime = `${formData.start_date}T${formData.start_time}:00`;
       const end_datetime = `${formData.end_date}T${formData.end_time}:00`;
 
-      const newBlock: Omit<AvailabilityBlock, 'id'> = {
+      const newBlock: any = {
         store_id: selectedStore,
         start_datetime,
         end_datetime,
         reason: formData.reason,
         block_type: formData.block_type,
         service_type: formData.service_type,
+        quantity: formData.quantity,
+        cancel_conflicts: cancelConflicts,
       };
 
       const token = getAdminToken();
@@ -181,6 +186,8 @@ export default function AvailabilityManagementPage() {
         },
         body: JSON.stringify(newBlock),
       });
+
+      const json = await response.json();
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
@@ -229,6 +236,7 @@ export default function AvailabilityManagementPage() {
       reason: '',
       block_type: 'closure',
       service_type: null,
+      quantity: 1,
     });
   };
 
@@ -468,13 +476,55 @@ export default function AvailabilityManagementPage() {
                   </label>
                   <select
                     value={formData.service_type || ''}
-                    onChange={(e) => setFormData({ ...formData, service_type: e.target.value as 'fitting' | 'workshop' | null || null })}
+                    onChange={(e) => {
+                      const newServiceType = e.target.value as 'fitting' | 'workshop' | null || null;
+                      setFormData({ 
+                        ...formData, 
+                        service_type: newServiceType,
+                        // Reset quantity if it exceeds new capacity
+                        quantity: 1
+                      });
+                    }}
                     className="w-full h-12 px-4 border border-gray-400 rounded-button focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Tous les services</option>
                     <option value="workshop">Atelier uniquement</option>
                     <option value="fitting">Étude posturale uniquement</option>
                   </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nombre de places à bloquer
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="range"
+                      min="1"
+                      max={
+                        formData.service_type === 'workshop' 
+                          ? (selectedStoreData?.workshop_capacity || 1)
+                          : formData.service_type === 'fitting'
+                            ? (selectedStoreData?.fitting_capacity || 1)
+                            : Math.min(selectedStoreData?.workshop_capacity || 1, selectedStoreData?.fitting_capacity || 1)
+                      }
+                      value={formData.quantity}
+                      onChange={(e) => setFormData({ ...formData, quantity: parseInt(e.target.value) })}
+                      className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                    />
+                    <div className="flex items-center justify-center w-12 h-12 bg-blue-50 border-2 border-blue-200 rounded-xl text-blue-700 font-bold text-lg">
+                      {formData.quantity}
+                    </div>
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Capacité disponible : {
+                      formData.service_type === 'workshop' 
+                        ? (selectedStoreData?.workshop_capacity || 1)
+                        : formData.service_type === 'fitting'
+                          ? (selectedStoreData?.fitting_capacity || 1)
+                          : Math.min(selectedStoreData?.workshop_capacity || 1, selectedStoreData?.fitting_capacity || 1)
+                    } technicien(s)
+                  </p>
                 </div>
 
                 <Input
@@ -532,7 +582,7 @@ export default function AvailabilityManagementPage() {
                   Annuler
                 </Button>
                 <Button
-                  onClick={handleAddBlock}
+                  onClick={() => handleAddBlock(false)}
                   fullWidth
                   disabled={!formData.start_date || !formData.end_date || !formData.reason}
                 >

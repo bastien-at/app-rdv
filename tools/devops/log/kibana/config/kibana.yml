@@ -1,0 +1,29 @@
+---
+## Default Kibana configuration from Kibana base image.
+## https://github.com/elastic/kibana/blob/main/src/dev/build/tasks/os_packages/docker_generator/templates/kibana_yml.template.ts
+#
+server.name: kibana
+server.host: 0.0.0.0
+server.publicBaseUrl: ${KIBANA_PUBLIC_BASEURL}
+elasticsearch.hosts: [ https://logs.alltricks.sexy:9200 ]
+
+monitoring.ui.container.elasticsearch.enabled: true
+monitoring.ui.container.logstash.enabled: true
+
+## X-Pack security credentials
+#
+elasticsearch.username: kibana_system
+elasticsearch.password: ${KIBANA_SYSTEM_PASSWORD}
+
+## SSL/TLS
+#
+server.ssl.enabled: true
+server.ssl.certificate: /usr/share/kibana/config/certs/kibana/live/logs.alltricks.sexy/fullchain.pem
+server.ssl.key: /usr/share/kibana/config/certs/kibana/live/logs.alltricks.sexy/privkey.pem
+
+## Additional
+xpack.security.encryptionKey: "63W4pAjHVpzF2MHzKMnjoaEFBauwWyjx4YbLe6fGy1AxEY0aVhcYgzIJ3NwgcxOB"
+xpack.encryptedSavedObjects.encryptionKey: "rStTP9Vh1F7hnCWLT4VbXs0vpMT2kvENgTTDpAQ9fXeG4pd3DPCUxorj5B1ZG7g1"
+xpack.reporting.encryptionKey: "mMzLJWwvOHJhJlB1Aqu1wlAvGaYVNh1aN2NnY5bNUI4fzgKqA8z8Wv6fIgUICPdp"
+xpack.reporting.kibanaServer.hostname: logs.alltricks.sexy
+xpack.reporting.queue.timeout: 120m

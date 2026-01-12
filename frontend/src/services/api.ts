@@ -143,21 +143,22 @@ export interface AdminConfirmBookingPayload {
   duration?: number;
 }
 
-export const adminConfirmBooking = async (
-  id: string,
-  payload: AdminConfirmBookingPayload = {},
-): Promise<Booking> => {
+export const adminConfirmBooking = async (id: string, payload?: AdminConfirmBookingPayload): Promise<void> => {
   const token = getAdminToken();
-  const { data } = await api.put<ApiResponse<Booking>>(
-    `/admin/bookings/${id}/confirm`,
-    payload,
-    {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+  await api.put(`/admin/bookings/${id}/confirm`, payload, {
+    headers: {
+      Authorization: `Bearer ${token}`,
     },
-  );
-  return data.data!;
+  });
+};
+
+export const adminUpdateBookingStatus = async (id: string, status: string, internal_notes?: string): Promise<void> => {
+  const token = getAdminToken();
+  await api.put(`/admin/bookings/${id}/status`, { status, internal_notes }, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 };
 
 // Etat des lieux (réception)
