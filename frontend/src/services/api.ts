@@ -20,7 +20,7 @@ import {
   PaginatedResponse
 } from '../types';
 
-const API_BASE_URL = (import.meta as any).env.VITE_API_URL || 'http://localhost:3000/api';
+const API_BASE_URL = (import.meta as any).env.VITE_API_URL || '/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
@@ -41,7 +41,11 @@ export const getStores = async (): Promise<Store[]> => {
 };
 
 export const getStoreById = async (id: string): Promise<Store> => {
-  const { data } = await api.get<ApiResponse<Store>>(`/stores/${id}`);
+  const token = getAdminToken();
+  const { data } = await api.get<ApiResponse<Store>>(
+    token ? `/admin/stores/${id}` : `/stores/${id}`,
+    token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
+  );
   return data.data!;
 };
 
@@ -68,6 +72,15 @@ export const updateStore = async (id: string, storeData: Partial<CreateStoreData
     },
   });
   return data.data!;
+};
+
+export const deleteStore = async (id: string): Promise<void> => {
+  const token = getAdminToken();
+  await api.delete(`/admin/stores/${id}`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
 };
 
 export const getStoreServices = async (storeId: string): Promise<Service[]> => {
@@ -375,7 +388,7 @@ export const getCustomers = async (
 ): Promise<PaginatedResponse<CustomerDirectory>> => {
   const token = getAdminToken();
   const response = await api.get<any>(
-    `/stores/${storeId}/customers`,
+    `/admin/stores/${storeId}/customers`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -401,7 +414,7 @@ export const searchCustomers = async (
 ): Promise<CustomerSearchResult[]> => {
   const token = getAdminToken();
   const { data } = await api.get<ApiResponse<CustomerSearchResult[]>>(
-    `/stores/${storeId}/customers/search`,
+    `/admin/stores/${storeId}/customers/search`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -418,7 +431,7 @@ export const createCustomer = async (
 ): Promise<CustomerDirectory> => {
   const token = getAdminToken();
   const { data } = await api.post<ApiResponse<CustomerDirectory>>(
-    `/stores/${storeId}/customers`,
+    `/admin/stores/${storeId}/customers`,
     customerData,
     {
       headers: {
@@ -435,7 +448,7 @@ export const updateCustomer = async (
 ): Promise<CustomerDirectory> => {
   const token = getAdminToken();
   const { data } = await api.put<ApiResponse<CustomerDirectory>>(
-    `/customers/${id}`,
+    `/admin/customers/${id}`,
     customerData,
     {
       headers: {
@@ -449,7 +462,7 @@ export const updateCustomer = async (
 export const deleteCustomer = async (id: string): Promise<CustomerDirectory> => {
   const token = getAdminToken();
   const { data } = await api.delete<ApiResponse<CustomerDirectory>>(
-    `/customers/${id}`,
+    `/admin/customers/${id}`,
     {
       headers: {
         Authorization: `Bearer ${token}`,

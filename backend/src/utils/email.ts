@@ -6,7 +6,7 @@ import { BookingWithDetails } from '../types';
 // Helper pour envoyer des emails via l'API Brevo directement (bypass SDK)
 const sendBrevoEmail = async (payload: any) => {
   const apiKey = (process.env.BREVO_API_KEY || '').trim();
-  
+
   if (!apiKey) {
     throw new Error('BREVO_API_KEY non configurée');
   }
@@ -95,7 +95,7 @@ export const sendReceptionReportEmail = async (report: any): Promise<void> => {
 
   const payload = {
     sender: {
-      name: 'Alltricks Bike Fitting',
+      name: 'Alltricks Services',
       email: process.env.EMAIL_FROM || 'noreply@alltricks.com',
     },
     to: [
@@ -123,14 +123,14 @@ export const sendReceptionReportEmail = async (report: any): Promise<void> => {
 const generateICalContent = (booking: BookingWithDetails): string => {
   const startDate = new Date(booking.start_datetime);
   const endDate = new Date(booking.end_datetime);
-  
+
   const formatICalDate = (date: Date) => {
     return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
   };
-  
+
   return `BEGIN:VCALENDAR
 VERSION:2.0
-PRODID:-//Alltricks//Bike Fitting//FR
+PRODID:-//Alltricks//Services//FR
 BEGIN:VEVENT
 UID:${booking.booking_token}@alltricks.com
 DTSTART:${formatICalDate(startDate)}
@@ -203,7 +203,7 @@ export const sendBookingRequestEmail = async (
 ): Promise<void> => {
   const dateFormatted = format(new Date(booking.start_datetime), "EEEE d MMMM yyyy 'à' HH:mm", { locale: fr });
   const cancelUrl = `${process.env.FRONTEND_URL}/booking/${booking.booking_token}/cancel`;
-  
+
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -257,17 +257,17 @@ export const sendBookingRequestEmail = async (
     </body>
     </html>
   `;
-  
+
   const payload = {
-    sender: { 
-      name: 'Alltricks Bike Fitting', 
-      email: process.env.EMAIL_FROM || 'noreply@alltricks.com' 
+    sender: {
+      name: 'Alltricks Services',
+      email: process.env.EMAIL_FROM || 'noreply@alltricks.com'
     },
     to: [{ email: booking.customer_email, name: `${booking.customer_firstname} ${booking.customer_lastname}` }],
     subject: `⏳ Demande de réservation reçue - ${booking.service_name}`,
     htmlContent: htmlContent
   };
-  
+
   console.log(`[Email] Tentative d'envoi de réception demande à ${booking.customer_email}`);
   try {
     const data = await sendBrevoEmail(payload);
@@ -295,9 +295,9 @@ export const sendConfirmationEmail = async (
 
   const mapsUrl = getGoogleMapsUrl(booking);
   const googleCalUrl = getGoogleCalendarUrl(booking);
-  
+
   const calendar = generateICalContent(booking);
-  
+
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -344,19 +344,19 @@ export const sendConfirmationEmail = async (
           
           <h2>🎯 Ce qu'il faut apporter</h2>
           ${isFitting
-            ? `<ul>
+      ? `<ul>
                  <li>Votre vélo (si vous en avez un)</li>
                  <li>Votre tenue de cyclisme habituelle</li>
                  <li>Vos chaussures de vélo</li>
                  <li>Vos cales/pédales automatiques si vous en utilisez</li>
                </ul>`
-            : `<ul>
+      : `<ul>
                  <li>Le vélo concerné par l'intervention</li>
                  <li>Votre clé d'antivol (si le vélo est attaché)</li>
                  <li>Le ticket de caisse ou la facture en cas de prise en charge garantie</li>
                  <li>Tout élément utile au diagnostic (ancien devis, photos, etc.)</li>
                </ul>`
-          }
+    }
           
           <h2>📍 Accès au magasin</h2>
           <p><strong>${booking.store_name}</strong></p>
@@ -393,11 +393,11 @@ export const sendConfirmationEmail = async (
     </body>
     </html>
   `;
-  
+
   const payload = {
-    sender: { 
-      name: 'Alltricks Bike Fitting', 
-      email: process.env.EMAIL_FROM || 'noreply@alltricks.com' 
+    sender: {
+      name: 'Alltricks Services',
+      email: process.env.EMAIL_FROM || 'noreply@alltricks.com'
     },
     to: [{ email: booking.customer_email, name: `${booking.customer_firstname} ${booking.customer_lastname}` }],
     subject: `✅ Réservation confirmée - ${booking.service_name}`,
@@ -407,7 +407,7 @@ export const sendConfirmationEmail = async (
       content: Buffer.from(generateICalContent(booking)).toString('base64'),
     }]
   };
-  
+
   console.log(`[Email] Tentative d'envoi de confirmation à ${booking.customer_email}`);
   try {
     const data = await sendBrevoEmail(payload);
@@ -429,11 +429,11 @@ export const sendReminderEmail = async (
   const cancelUrl = `${process.env.FRONTEND_URL}/booking/${booking.booking_token}/cancel`;
   const isFitting = booking.service_type === 'fitting';
   const mapsUrl = getGoogleMapsUrl(booking);
-  
-  const subject = daysBeforeconst === 2 
+
+  const subject = daysBeforeconst === 2
     ? `🔔 Rappel : Votre ${isFitting ? "étude posturale" : "rendez-vous atelier"} dans 2 jours`
     : `⏰ Rappel : Votre ${isFitting ? "étude posturale" : "rendez-vous atelier"} demain`;
-  
+
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -468,9 +468,9 @@ export const sendReminderEmail = async (
           
           <p>
             ${isFitting
-              ? "N'oubliez pas d'apporter votre vélo (si vous en avez un), votre tenue et vos chaussures de cyclisme."
-              : "Merci d'apporter le vélo concerné, ainsi que votre clé d'antivol et vos justificatifs si une prise en charge garantie est nécessaire."
-            }
+      ? "N'oubliez pas d'apporter votre vélo (si vous en avez un), votre tenue et vos chaussures de cyclisme."
+      : "Merci d'apporter le vélo concerné, ainsi que votre clé d'antivol et vos justificatifs si une prise en charge garantie est nécessaire."
+    }
           </p>
 
           <p>
@@ -493,17 +493,17 @@ export const sendReminderEmail = async (
     </body>
     </html>
   `;
-  
+
   const payload = {
-    sender: { 
-      name: 'Alltricks Bike Fitting', 
-      email: process.env.EMAIL_FROM || 'noreply@alltricks.com' 
+    sender: {
+      name: 'Alltricks Services',
+      email: process.env.EMAIL_FROM || 'noreply@alltricks.com'
     },
     to: [{ email: booking.customer_email, name: booking.customer_firstname }],
     subject: subject,
     htmlContent: htmlContent
   };
-  
+
   console.log(`[Email] Tentative d'envoi de rappel (${daysBeforeconst}j) à ${booking.customer_email}`);
   try {
     const data = await sendBrevoEmail(payload);
@@ -522,7 +522,7 @@ export const sendCancellationEmail = async (
 ): Promise<void> => {
   const dateFormatted = format(new Date(booking.start_datetime), "EEEE d MMMM yyyy 'à' HH:mm", { locale: fr });
   const bookAgainUrl = `${process.env.FRONTEND_URL}/stores/${booking.store_id}`;
-  
+
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -569,17 +569,17 @@ export const sendCancellationEmail = async (
     </body>
     </html>
   `;
-  
+
   const payload = {
-    sender: { 
-      name: 'Alltricks Bike Fitting', 
-      email: process.env.EMAIL_FROM || 'noreply@alltricks.com' 
+    sender: {
+      name: 'Alltricks Services',
+      email: process.env.EMAIL_FROM || 'noreply@alltricks.com'
     },
     to: [{ email: booking.customer_email, name: `${booking.customer_firstname} ${booking.customer_lastname}` }],
     subject: '❌ Réservation annulée',
     htmlContent: htmlContent
   };
-  
+
   console.log(`[Email] Tentative d'envoi d'annulation à ${booking.customer_email}`);
   try {
     const data = await sendBrevoEmail(payload);
@@ -598,7 +598,7 @@ export const sendPasswordResetEmail = async (
   resetToken: string
 ): Promise<void> => {
   const resetUrl = `${process.env.FRONTEND_URL}/admin/reset-password/${resetToken}`;
-  
+
   const htmlContent = `
     <!DOCTYPE html>
     <html>
@@ -641,17 +641,17 @@ export const sendPasswordResetEmail = async (
     </body>
     </html>
   `;
-  
+
   const payload = {
-    sender: { 
-      name: 'Alltricks Admin', 
-      email: process.env.EMAIL_FROM || 'noreply@alltricks.com' 
+    sender: {
+      name: 'Alltricks Admin',
+      email: process.env.EMAIL_FROM || 'noreply@alltricks.com'
     },
     to: [{ email: email }],
     subject: '🔒 Réinitialisation de votre mot de passe',
     htmlContent: htmlContent
   };
-  
+
   console.log(`[Email] Envoi email reset password à ${email}`);
   try {
     const data = await sendBrevoEmail(payload);
@@ -672,7 +672,7 @@ export const verifyEmailConfig = async (): Promise<boolean> => {
       console.error('❌ BREVO_API_KEY non configurée');
       return false;
     }
-    
+
     const response = await fetch('https://api.brevo.com/v3/account', {
       headers: {
         'api-key': apiKey,

@@ -5,7 +5,7 @@ import AdminLayout from '../../components/admin/AdminLayout';
 import Button from '../../components/Button';
 import Input from '../../components/Input';
 import { Store, AdminWithStore, CreateAdminData, UpdateAdminData, CreateStoreData } from '../../types';
-import { getStores, getAdmins, createAdmin, updateAdmin, deleteAdminApi, createStore } from '../../services/api';
+import { getStores, getAdmins, createAdmin, updateAdmin, deleteAdminApi, createStore, deleteStore } from '../../services/api';
 
 interface AdminFormState {
   id?: string;
@@ -179,6 +179,17 @@ export default function AdminUsersManagementPage() {
     }
   };
 
+  const handleDeleteStore = async (store: Store) => {
+    if (!confirm(`Supprimer définitivement le magasin ${store.name} ? Cette action supprimera également tous les services, administrateurs et réservations associés.`)) return;
+    try {
+      await deleteStore(store.id);
+      await loadData();
+    } catch (error) {
+      console.error('Erreur suppression magasin:', error);
+      alert('Erreur lors de la suppression du magasin');
+    }
+  };
+
   const availableStoresForNewAdmin = useMemo(() => {
     const usedStoreIds = new Set(admins.filter(a => a.store_id).map(a => a.store_id as string));
     return stores.filter(store => !usedStoreIds.has(store.id));
@@ -240,47 +251,60 @@ export default function AdminUsersManagementPage() {
                       <p className="text-sm text-gray-500">{store.city}</p>
                     </div>
                   </div>
-                  {admin ? (
-                    <div className="space-y-2 text-sm">
-                      <div className="flex items-center justify-between">
-                        <span className="font-medium text-gray-900">{admin.name}</span>
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${admin.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-                          {admin.active ? 'Actif' : 'Inactif'}
-                        </span>
+                  <div className="flex-1">
+                    {admin ? (
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-gray-900">{admin.name}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${admin.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                            {admin.active ? 'Actif' : 'Inactif'}
+                          </span>
+                        </div>
+                        <p className="text-gray-600 truncate">{admin.email}</p>
+                        <p className="text-xs text-gray-500">Rôle : {admin.role === 'super_admin' ? 'Super admin' : 'Admin magasin'}</p>
+                        <div className="flex gap-2 mt-3">
+                          <Button
+                            variant="ghost"
+                            className="flex-1 border border-gray-300 hover:border-blue-500 hover:bg-blue-50"
+                            onClick={() => openEditModal(admin)}
+                          >
+                            <Edit2 className="h-4 w-4 mr-1" />
+                            Modifier
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            className="border border-gray-300 hover:border-red-500 hover:bg-red-50"
+                            onClick={() => handleDelete(admin)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
-                      <p className="text-gray-600 truncate">{admin.email}</p>
-                      <p className="text-xs text-gray-500">Rôle : {admin.role === 'super_admin' ? 'Super admin' : 'Admin magasin'}</p>
-                      <div className="flex gap-2 mt-3">
+                    ) : (
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500 mb-3">Aucun admin magasin assigné.</p>
                         <Button
                           variant="ghost"
-                          className="flex-1 border border-gray-300 hover:border-blue-500 hover:bg-blue-50"
-                          onClick={() => openEditModal(admin)}
+                          className="w-full border border-dashed border-gray-300 hover:border-blue-500 hover:bg-blue-50"
+                          onClick={() => openCreateModal(store.id)}
                         >
-                          <Edit2 className="h-4 w-4 mr-1" />
-                          Modifier
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          className="border border-gray-300 hover:border-red-500 hover:bg-red-50"
-                          onClick={() => handleDelete(admin)}
-                        >
-                          <Trash2 className="h-4 w-4" />
+                          <Plus className="h-4 w-4 mr-2" />
+                          Assigner un admin magasin
                         </Button>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500 mb-3">Aucun admin magasin assigné.</p>
-                      <Button
-                        variant="ghost"
-                        className="w-full border border-dashed border-gray-300 hover:border-blue-500 hover:bg-blue-50"
-                        onClick={() => openCreateModal(store.id)}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Assigner un admin magasin
-                      </Button>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <Button
+                      variant="ghost"
+                      className="w-full text-red-600 hover:text-red-700 hover:bg-red-50 border border-transparent hover:border-red-200"
+                      size="sm"
+                      onClick={() => handleDeleteStore(store)}
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Supprimer le magasin
+                    </Button>
+                  </div>
                 </div>
               );
             })}

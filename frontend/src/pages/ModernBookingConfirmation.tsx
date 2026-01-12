@@ -203,15 +203,6 @@ END:VCALENDAR`;
                 <h3 className="text-xl font-bold text-gray-900">
                   {booking.service_name}
                 </h3>
-                {!isCancelled && (
-                  <button
-                    onClick={() => navigate(`/stores/${booking.store_id}/booking?edit=${token}`)}
-                    className="flex items-center gap-2 text-blue-600 hover:text-blue-700 text-sm font-medium"
-                  >
-                    <Edit2 className="h-4 w-4" />
-                    Modifier
-                  </button>
-                )}
               </div>
 
               <div className="space-y-4">

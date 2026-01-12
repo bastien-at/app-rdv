@@ -37,8 +37,9 @@ export const calculateAvailableSlots = async (
   const dayName = format(date, 'EEEE').toLowerCase() as keyof typeof store.opening_hours;
   const daySchedule: DaySchedule = store.opening_hours[dayName];
   
-  if (!daySchedule || daySchedule.closed) {
-    return []; // Magasin fermé ce jour
+  // Bloquer systématiquement les dimanches
+  if (date.getDay() === 0 || !daySchedule || daySchedule.closed) {
+    return []; // Magasin fermé ou dimanche
   }
   
   // 4. Générer tous les créneaux possibles
