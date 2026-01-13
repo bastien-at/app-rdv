@@ -1,6 +1,11 @@
 {
-  "generatedAt": "2026-01-13T20:24:00.000Z",
+  "generatedAt": "2026-01-13T20:26:00.000Z",
   "entries": [
+    {
+      "hash": "9ca254d",
+      "message": "fix: remove startOfMonth() to prevent UTC offset in calendar day calculation",
+      "date": "2026-01-13"
+    },
     {
       "hash": "2566d84",
       "message": "fix: ultra-robust calendar logic with null-checks and timezone-safe date handling to prevent TypeError on getDay()",
