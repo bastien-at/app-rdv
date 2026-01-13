@@ -7,9 +7,8 @@ import { adminLogin } from '../../services/api';
 
 type ChangelogEntry = {
   hash: string;
-  author: string;
   date: string;
-  subject: string;
+  message: string;
 };
 
 type ChangelogData = {
@@ -221,10 +220,7 @@ export default function AdminLoginPage() {
 
         <div className="mt-4 text-xs text-gray-500">
           <div className="flex items-center justify-between">
-            <span>
-              Version {appVersion || '—'}
-              {appGitSha ? ` (${appGitSha.slice(0, 7)})` : ''}
-            </span>
+          
             {changelog?.generatedAt ? (
               <span>
                 Changelog {new Date(changelog.generatedAt).toLocaleString()}
@@ -239,11 +235,11 @@ export default function AdminLoginPage() {
                 {changelog.entries.slice(0, 10).map((entry) => (
                   <div key={entry.hash} className="text-gray-600">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="truncate">{entry.subject}</span>
-                      <span className="shrink-0">{entry.hash.slice(0, 7)}</span>
+                      <span className="truncate">{entry.message}</span>
+                      <span className="shrink-0 font-mono text-[10px]">{entry.hash.slice(0, 7)}</span>
                     </div>
                     <div className="text-[11px] text-gray-400">
-                      {new Date(entry.date).toLocaleString()} · {entry.author}
+                      {new Date(entry.date).toLocaleDateString()}
                     </div>
                   </div>
                 ))}
