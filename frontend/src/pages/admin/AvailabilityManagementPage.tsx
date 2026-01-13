@@ -33,6 +33,7 @@ interface AvailabilityBlock {
   reason: string;
   block_type: 'closure' | 'maintenance' | 'holiday' | 'other';
   service_type?: 'fitting' | 'workshop' | null;
+  quantity?: number;
 }
 
 export default function AvailabilityManagementPage() {
@@ -190,14 +191,25 @@ export default function AvailabilityManagementPage() {
       const json = await response.json();
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        console.error('Erreur API création blocage:', errorData);
-        throw new Error(errorData.error || errorData.message || 'Erreur API création blocage');
+        if (response.status === 409 && json.error === 'CONFLICTING_BOOKINGS') {
+          const count = json.conflicts.length;
+          const confirmCancel = window.confirm(
+            `⚠️ ${count} rendez-vous sont déjà programmés sur ce créneau.\n\n` +
+            `Voulez-vous les annuler automatiquement et envoyer les emails de notification aux clients ?` 
+          );
+          
+          if (confirmCancel) {
+            await handleAddBlock(true); // Relancer avec l'autorisation d'annuler
+          }
+          return;
+        }
+        throw new Error(json.error || 'Erreur API création blocage');
       }
 
       setShowAddModal(false);
       resetForm();
       await loadBlocks();
+      if (json.message) alert(json.message);
     } catch (error: any) {
       console.error('Erreur création blocage:', error);
       alert(error.message || 'Erreur lors de la création du blocage');
@@ -327,7 +339,7 @@ export default function AvailabilityManagementPage() {
                             {schedule.closed ? (
                               'Fermé'
                             ) : (
-                              `${schedule.open} - ${schedule.close}`
+                              `${schedule.open} - ${schedule.close}` 
                             )}
                           </span>
                         </div>

@@ -685,7 +685,7 @@ export const createAvailabilityBlock = async (
     const start = new Date(start_datetime);
     const end = new Date(end_datetime);
 
-    // 1. Vérifier s'il y a des RDV confirmés sur ce créneau
+    // 1. Vérifier s'il y a des réservations en conflit
     const conflictResult = await query<BookingWithDetails>(
       `SELECT 
         b.*,

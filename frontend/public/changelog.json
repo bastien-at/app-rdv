@@ -1,6 +1,26 @@
 {
-  "generatedAt": "2026-01-13T15:35:00.000Z",
+  "generatedAt": "2026-01-13T16:21:00.000Z",
   "entries": [
+    {
+      "hash": "eec38e2",
+      "message": "fix: resolve git conflicts in adminController.ts and merge availability block logic",
+      "date": "2026-01-13"
+    },
+    {
+      "hash": "c373b2f",
+      "message": "fix: additional timezone and UI improvements for admin pages",
+      "date": "2026-01-13"
+    },
+    {
+      "hash": "c0b861a",
+      "message": "fix: force timezone Europe/Paris in backend and database session to avoid date offset in production",
+      "date": "2026-01-13"
+    },
+    {
+      "hash": "8cedd31",
+      "message": "feat: update changelog and show commit messages in admin login page",
+      "date": "2026-01-13"
+    },
     {
       "hash": "eefd892",
       "message": "chore: resolve conflict in server.ts keeping old rate limit version",
@@ -10,21 +30,6 @@
       "hash": "c8c0a21",
       "message": "feat: separation des capacités atelier et étude posturale, correction routage clients et optimisation rate limit",
       "date": "2026-01-12"
-    },
-    {
-      "hash": "f86efcf",
-      "message": "fix: reservation button redirection and city slug normalization with accents",
-      "date": "2026-01-08"
-    },
-    {
-      "hash": "5aa880c",
-      "message": "feat: show version and changelog on admin login",
-      "date": "2026-01-02"
-    },
-    {
-      "hash": "1ddcf98",
-      "message": "Admin: accès gestion admins, scroll layout et améliorations prestations",
-      "date": "2025-12-19"
     }
   ]
 }
