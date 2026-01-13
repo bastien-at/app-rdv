@@ -1,3 +1,6 @@
+// Forcer le fuseau horaire pour éviter les décalages de dates
+process.env.TZ = 'Europe/Paris';
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
