@@ -181,6 +181,7 @@ export default function ModernBookingPage() {
     if (!selectedService || !storeId) return;
     
     const days = getDaysInMonth().filter(day => {
+      if (!day) return false; // Filtrer les valeurs null du padding
       const isPast = isBefore(day, startOfDay(new Date()));
       const isSunday = day.getDay() === 0;
       return !isPast && !isSunday;
@@ -554,9 +555,6 @@ export default function ModernBookingPage() {
                         ))}
                       </div>
                       <div className="grid grid-cols-7 gap-1">
-                        {[...Array(((startOfMonth(currentMonth).getDay() + 6) % 7))].map((_, i) => (
-                          <div key={`empty-${i}`} className="aspect-square" />
-                        ))}
                         {getDaysInMonth().map((day, i) => {
                           if (!day) {
                             return <div key={`empty-${i}`} className="aspect-square" />;
