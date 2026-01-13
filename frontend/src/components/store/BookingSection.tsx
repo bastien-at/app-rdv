@@ -126,11 +126,12 @@ export default function BookingSection({
     const end = endOfMonth(currentMonth);
     const days = eachDayOfInterval({ start, end });
     
-    // Calculer le décalage pour le premier jour du mois (Lundi = 1, ..., Dimanche = 0)
-    // On veut Lundi en premier (index 0), donc on ajuste : (day === 0) ? 6 : day - 1
+    // getDay() : 0=Dim, 1=Lun, 2=Mar, 3=Mer, 4=Jeu, 5=Ven, 6=Sam
+    // On veut Lundi en premier (index 0)
+    // Janvier 2026 commence un Jeudi (4) -> on veut 3 cases vides avant (Lun, Mar, Mer)
     const day = start.getDay();
-    const firstDayOfWeek = (day === 0) ? 6 : day - 1;
-    const padding = Array(firstDayOfWeek).fill(null);
+    const paddingCount = day === 0 ? 6 : day - 1;
+    const padding = Array(paddingCount).fill(null);
     
     return [...padding, ...days];
   };
