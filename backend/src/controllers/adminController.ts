@@ -645,47 +645,72 @@ export const createAvailabilityBlock = async (
       cancel_conflicts = false,
     } = req.body;
 
+    const start = new Date(start_datetime);
+    const end = new Date(end_datetime);
+
     // 1. Vérifier s'il y a des réservations en conflit
-    let conflictQuery = `
-      SELECT b.*, srv.name as service_name
+    const conflictResult = await query<BookingWithDetails>(
+      `SELECT 
+        b.*,
+        srv.name as service_name,
+        srv.service_type,
+        st.name as store_name,
+        st.email as store_email,
+        st.phone as store_phone
       FROM bookings b
       JOIN services srv ON b.service_id = srv.id
-      WHERE b.store_id = $1
-      AND b.status NOT IN ('cancelled')
-      AND (
-        (b.start_datetime < $3 AND b.end_datetime > $2)
-      )
-    `;
-    const conflictParams: any[] = [store_id, start_datetime, end_datetime];
+      JOIN stores st ON b.store_id = st.id
+      WHERE b.store_id = $1 
+      AND b.status IN ('confirmed', 'pending')
+      AND b.start_datetime < $2 
+      AND b.end_datetime > $3`,
+      [store_id, end, start]
+    );
 
-    if (service_type) {
-      conflictQuery += ` AND srv.service_type = $4`;
-      conflictParams.push(service_type);
-    }
+    const conflictingBookings = conflictResult.rows;
 
-    const conflictsResult = await query(conflictQuery, conflictParams);
-
-    if (conflictsResult.rows.length > 0 && !cancel_conflicts) {
+    // 2. S'il y a des conflits et que l'admin n'a pas explicitement demandé de les annuler
+    if (conflictingBookings.length > 0 && !cancel_conflicts) {
       res.status(409).json({
         success: false,
         error: 'CONFLICTING_BOOKINGS',
-        conflicts: conflictsResult.rows,
+        conflicts: conflictingBookings.map(b => ({
+          id: b.id,
+          customer_name: `${b.customer_firstname} ${b.customer_lastname}`,
+          start_datetime: b.start_datetime,
+          service_name: b.service_name,
+          status: b.status
+        })),
+        message: `${conflictingBookings.length} RDV existant(s) sur ce créneau.`,
       });
       return;
     }
 
-    // 2. Si cancel_conflicts est vrai, annuler les réservations
-    if (conflictsResult.rows.length > 0 && cancel_conflicts) {
-      for (const booking of conflictsResult.rows) {
+    // 3. Si cancel_conflicts est vrai, annuler les RDV
+    if (conflictingBookings.length > 0 && cancel_conflicts) {
+      const { sendCancellationEmail } = require('../utils/email');
+      
+      for (const booking of conflictingBookings) {
         await query(
-          `UPDATE bookings SET status = 'cancelled', cancelled_at = NOW(), cancellation_reason = $1 WHERE id = $2`,
-          [`Annulé suite à un blocage exceptionnel : ${reason || 'Maintenance'}`, booking.id]
+          `UPDATE bookings 
+           SET status = 'cancelled', 
+               cancelled_at = NOW(), 
+               cancellation_reason = $1,
+               internal_notes = COALESCE(internal_notes, '') || '\nAnnulé automatiquement suite à un blocage : ' || $2
+           WHERE id = $3`,
+          ['Annulation automatique suite à une fermeture exceptionnelle / blocage.', reason || 'Blocage admin', booking.id]
         );
-        // Note: L'envoi d'email pourrait être ajouté ici si nécessaire
+
+        // Envoyer l'email d'annulation
+        try {
+          await sendCancellationEmail(booking);
+        } catch (emailError) {
+          console.error(`Erreur envoi email annulation automatique pour RDV ${booking.id}:`, emailError);
+        }
       }
     }
 
-    // 3. Créer le blocage
+    // 4. Créer le blocage
     const result = await query(
       `INSERT INTO availability_blocks (store_id, technician_id, start_datetime, end_datetime, reason, block_type, service_type, quantity)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -705,8 +730,8 @@ export const createAvailabilityBlock = async (
     res.status(201).json({
       success: true,
       data: result.rows[0],
-      message: conflictsResult.rows.length > 0 
-        ? `Blocage créé et ${conflictsResult.rows.length} réservation(s) annulée(s)`
+      message: conflictingBookings.length > 0 
+        ? `Blocage créé et ${conflictingBookings.length} RDV annulé(s).` 
         : 'Blocage créé avec succès',
     });
   } catch (error) {
