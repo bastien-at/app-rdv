@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-01-13T16:33:00.000Z",
+  "generatedAt": "2026-01-13T17:30:00.000Z",
   "entries": [
     {
-      "hash": "71dc7b7",
-      "message": "fix: calendar day alignment in ModernBookingPage and BookingSection",
+      "hash": "678aac9",
+      "message": "fix: explicit calendar padding logic for correct day alignment",
       "date": "2026-01-13"
     },
     {
@@ -25,11 +25,6 @@
       "hash": "8cedd31",
       "message": "feat: update changelog and show commit messages in admin login page",
       "date": "2026-01-13"
-    },
-    {
-      "hash": "eefd892",
-      "message": "chore: resolve conflict in server.ts keeping old rate limit version",
-      "date": "2026-01-12"
     }
   ]
 }
