@@ -124,7 +124,15 @@ export default function BookingSection({
   const getDaysInMonth = () => {
     const start = startOfMonth(currentMonth);
     const end = endOfMonth(currentMonth);
-    return eachDayOfInterval({ start, end });
+    const days = eachDayOfInterval({ start, end });
+    
+    // Calculer le décalage pour le premier jour du mois (Lundi = 1, ..., Dimanche = 0)
+    // On veut Lundi en premier (index 0), donc on ajuste : (day === 0) ? 6 : day - 1
+    const day = start.getDay();
+    const firstDayOfWeek = (day === 0) ? 6 : day - 1;
+    const padding = Array(firstDayOfWeek).fill(null);
+    
+    return [...padding, ...days];
   };
 
   if (!selectedService) return null;
@@ -220,6 +228,9 @@ export default function BookingSection({
                       </div>
                     ))}
                     {getDaysInMonth().map((day, i) => {
+                      if (!day) {
+                        return <div key={`empty-${i}`} className="aspect-square" />;
+                      }
                       const isPast = isBefore(day, startOfDay(new Date()));
                       const isSelected = selectedDate && isSameDay(day, selectedDate);
                       const isCurrentDay = isToday(day);
