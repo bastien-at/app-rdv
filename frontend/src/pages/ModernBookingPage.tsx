@@ -338,10 +338,10 @@ export default function ModernBookingPage() {
     const end = endOfMonth(currentMonth);
     const days = eachDayOfInterval({ start, end });
     
-    // Calculer le décalage pour le premier jour du mois (Lundi = 0, ..., Dimanche = 6)
-    // getDay() renvoie 0 pour Dimanche, 1 pour Lundi, etc.
-    // On veut Lundi en premier, donc on ajuste : (day + 6) % 7
-    const firstDayOfWeek = (start.getDay() + 6) % 7;
+    // Calculer le décalage pour le premier jour du mois (Lundi = 1, ..., Dimanche = 0)
+    // On veut Lundi en premier (index 0), donc on ajuste : (day + 6) % 7
+    const day = start.getDay();
+    const firstDayOfWeek = (day === 0) ? 6 : day - 1;
     const padding = Array(firstDayOfWeek).fill(null);
     
     return [...padding, ...days];
