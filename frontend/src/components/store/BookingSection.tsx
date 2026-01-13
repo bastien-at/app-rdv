@@ -128,18 +128,23 @@ export default function BookingSection({
         ? currentMonth 
         : new Date();
 
-      // 2. Calculer le premier jour du mois de manière isolée des fuseaux horaires
+      // 2. Calculer le premier jour du mois à midi pour éviter les décalages UTC
       const year = baseDate.getFullYear();
       const month = baseDate.getMonth();
-      const firstDayOfMonth = new Date(year, month, 1, 12, 0, 0); // Midi pour éviter les décalages de bordure UTC
+      const firstDayOfMonth = new Date(year, month, 1, 12, 0, 0);
       
-      const start = startOfMonth(firstDayOfMonth);
-      const end = endOfMonth(firstDayOfMonth);
-      const days = eachDayOfInterval({ start, end });
+      // 3. Calculer le nombre de jours dans le mois
+      const lastDayOfMonth = new Date(year, month + 1, 0, 12, 0, 0);
+      const daysInMonth = lastDayOfMonth.getDate();
       
-      // 3. Calculer le padding (Lundi=1, ..., Samedi=6, Dimanche=0)
+      // 4. Créer le tableau des jours (tous à midi pour éviter les décalages)
+      const days = Array.from({ length: daysInMonth }, (_, i) => 
+        new Date(year, month, i + 1, 12, 0, 0)
+      );
+      
+      // 5. Calculer le padding (Lundi=1, ..., Samedi=6, Dimanche=0)
       // On veut Lundi en premier (index 0)
-      const dayOfWeek = start.getDay(); 
+      const dayOfWeek = firstDayOfMonth.getDay(); 
       const paddingCount = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
       const padding = Array(paddingCount).fill(null);
       
