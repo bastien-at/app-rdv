@@ -113,7 +113,7 @@ export const getStoreById = async (
 };
 
 /**
- * Récupère les services d'un magasin
+ * Récupère les services d'un magasin (uniquement les services locaux)
  */
 export const getStoreServices = async (
   req: Request,
@@ -136,9 +136,11 @@ export const getStoreServices = async (
       return;
     }
     
-    // Récupérer les services
+    // Récupérer uniquement les services locaux du magasin (pas les globaux)
     const servicesResult = await query<Service>(
-      'SELECT * FROM services WHERE store_id = $1 AND active = true ORDER BY price',
+      `SELECT * FROM services 
+       WHERE store_id = $1 AND active = true 
+       ORDER BY service_type, price, name`,
       [id]
     );
     
@@ -156,7 +158,7 @@ export const getStoreServices = async (
 };
 
 /**
- * Récupère un magasin avec ses services
+ * Récupère un magasin avec ses services (uniquement les services locaux)
  */
 export const getStoreWithServices = async (
   req: Request,
@@ -178,8 +180,11 @@ export const getStoreWithServices = async (
       return;
     }
     
+    // Services locaux du magasin uniquement (pas les globaux)
     const servicesResult = await query<Service>(
-      'SELECT * FROM services WHERE store_id = $1 AND active = true ORDER BY price',
+      `SELECT * FROM services 
+       WHERE store_id = $1 AND active = true 
+       ORDER BY service_type, price, name`,
       [id]
     );
     
@@ -337,6 +342,12 @@ export const updateStore = async (
     if (updateData.workshop_capacity !== undefined) {
       updates.push(`workshop_capacity = $${paramIndex}`);
       values.push(updateData.workshop_capacity);
+      paramIndex++;
+    }
+
+    if (updateData.fitting_capacity !== undefined) {
+      updates.push(`fitting_capacity = $${paramIndex}`);
+      values.push(updateData.fitting_capacity);
       paramIndex++;
     }
     

@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ template "fullname" . }}
+data:
+  nginx-conf-template: |+
+    events {}
+    stream {
+        {{- range $key, $value := .Values.targets }}
+        server {
+            listen 0.0.0.0:{{ $value.port.source }};
+            proxy_pass  {{`${`}}{{ $value.envVarName }}{{`}`}}:{{ $value.port.target }};
+        }
+        {{- end }}
+    }

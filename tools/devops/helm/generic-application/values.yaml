@@ -1,0 +1,200 @@
+# Name of the app to everwrite default name "generic-application"
+nameOverride: ~
+fullnameOverride: ~
+
+global:
+  env: dev
+  git:
+    commit: "dummy"
+    branchSlug: "branch"
+    pullRequest:
+      id: ""
+  ingress:
+    basicAuth:
+      enabled: false
+  deployment:
+    env: ~
+
+service:
+  type: ClusterIP
+  ports:
+    http: 80
+
+image:
+  repository: ~
+  tag: ~
+
+container:
+  name: http
+  ports:
+    http: 80
+
+workingDir: "/var/www/html"
+
+ingress:
+  enabled: false
+  className: "nginx"
+  certManager: false
+  basicAuth:
+    enabled: false
+  # Used to create Ingress record (should used with service.type: ClusterIP).
+  hosts:
+    - mail.example.com
+  annotations: {}
+  # kubernetes.io/tls-acme: "true"
+  tls: []
+  # Secrets must be manually created in the namespace.
+  # - secretName: mail-example-tls
+  #   hosts:
+  #     - mail.example.com
+
+blueGreen:
+  enabled: false
+  color: ~
+  # Can be :
+  # - deploy (deploy new pods on the color)
+  # - switch (switch color on all services)
+  # - switch-cdn (switch color on cdn services)
+  # - switch-app (switch color on not cdn services)
+  # - clean (remove old pods)
+  phase: ~
+
+serviceAccount:
+  create: false
+
+labels:
+  app-type: web
+
+loadBalancer:
+  enabled: false
+
+resources: {}
+  # If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #  cpu: 100m
+  #  memory: 128Mi
+  #requests:
+  #  cpu: 100m
+  #  memory: 128Mi
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+initContainers: []
+
+nfs:
+  enabled: false
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+replicaCount: 1
+
+# Can be list (legacy) or dict, dict is easily extendable by different values files
+# List :
+# hostAliases:
+#   - ip: 127.0.0.1
+#     hostnames:
+#       - foo.bar
+#   - ip: 127.0.0.2
+#     hostnames:
+#       - bar.foo
+# Dict :
+# hostAliases:
+#   foo:
+#     ip: 127.0.0.1
+#     hostnames:
+#       - foo.bar
+#   bar:
+#     ip: 127.0.0.2
+#     hostnames:
+#       - bar.foo
+hostAliases: ~
+
+livenessProbe:
+  tcpSocket:
+    port: http
+  initialDelaySeconds: 30
+  timeoutSeconds: 5
+
+test:
+  host: ""
+  port: 80
+  file: ".deploy_check_id.txt"
+  deployCheckId: ""
+
+memcached:
+  enabled: false
+  image: memcached:1.6.35-alpine
+  size: 64
+  resources: {}
+  lifecycle:
+    preStop:
+      exec:
+        command:
+          - /bin/sh
+          - -c
+          - while nc 127.0.0.1 9000 -vz; do echo "Wait php end..." && sleep 1;
+            done;
+
+cdn:
+  enabled: false
+  service:
+    type: ClusterIP
+    ports:
+      http: 80
+    externalTrafficPolicy: ~
+    annotations: {}
+
+  ingress:
+    className: "gce"
+    staticIpName: ~
+    hostname: ~
+    hosts: []
+    tls: []
+    annotations: {}
+
+  backendConfig:
+    customRequestHeaders: {}
+    customResponseHeaders:
+      headers:
+        - "X-Cdn-Cache-Status: {cdn_cache_status}"
+    healthCheck:
+      host: ~
+      requestPath: /health
+      port: 80
+    cdn:
+      cachePolicy:
+        includeHost: true
+        includeProtocol: false
+        includeQueryString: true
+      cacheMode: CACHE_ALL_STATIC
+      clientTtl: 604800
+      defaultTtl: 604800
+      maxTtl: 604800
+      negativeCaching: true
+      negativeCachingPolicy:
+        - code: 404
+          ttl: 1800
+      requestCoalescing: true
+      serveWhileStale: 7200
+
+
+# Array of extra objects to deploy with the release (evaluated as a template).
+extraDeploy: []
+
+# Shared config files (cf. README.md)
+# global:
+#  configFiles:
+#    key:
+#      localPath: config_files/localPath.txt
+#      mountPath: /etc/app/mountPath.txt
+#      subPath: subPath

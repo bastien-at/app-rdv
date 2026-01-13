@@ -1,0 +1,94 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "elastic-agent.name" . }}-configmap-scripts
+data:
+  backup-rotated.sh: |-
+    #!/bin/bash
+    set -e
+
+    SYMLINKS_LIST=/dev/shm/rotator
+    cleanup () {
+        rm -rf "${SYMLINKS_LIST}"
+        exit
+    }
+    trap cleanup SIGHUP SIGINT SIGTERM
+
+    # Options
+    declare -a path_patterns=()
+    while getopts ":s:r:hd" opt; do
+        case $opt in
+            d) echo "Debug mode enabled, sleep..."
+               sleep 86400
+               exit 10
+               ;;
+            s) sleep_duration="$OPTARG";;
+            r) remove_wait="$OPTARG";;
+            h) echo "Help:
+        -s sleep duration in seconds between each loop
+        -r time to wait in seconds before remove a backup (actually, will be converted in minutes)
+              "
+               exit 10
+               ;;
+            *) ;;
+        esac
+    done
+
+    if [[ "$sleep_duration" = "" ]]; then
+        echo "No detection interval, use -h for help"
+        exit 1
+    fi
+
+    if [[ "$remove_wait" = "" ]]; then
+        echo "No remove wait, use -h for help"
+        exit 1
+    fi
+
+    touch /tmp/opened.stats
+    touch /tmp/closed.stats
+
+    while [ 1 ]; do
+        start_ms=$(date +%s%3N)
+        echo "loop $start_ms"
+
+        find /var/log/containers -type l -xtype f -printf '%p %l\n' 2> /dev/null > "${SYMLINKS_LIST}" || true
+
+        find /var/log/pods -type f -name '*.log' -links 1 -printf '%p %i\n' 2> /dev/null | \
+        while read -r hardlink inode; do
+            container_path=$(grep "$hardlink" "${SYMLINKS_LIST}" || echo "")
+            symlink="${container_path%% *}"
+
+            if [[ -z "$container_path" ]]; then
+                echo "  Missing link $hardlink (from $symlink)"
+                continue
+            fi
+
+            filename="${symlink##*/}"
+            link="/var/log/containers/app-${inode}-${filename}"
+            test -f "$link" || ( ln "$hardlink" "$link" && echo "  Create hardlink $hardlink (from $symlink) → $link" )
+        done
+
+        # Find old log files no longer used by containers and compare list to started harvester and closed harvester
+        # Remove old files never started (so not processed by agent) and old files closed (so read fully)
+        # Finally remove files older that 6h (security)
+        find /var/log/containers -type f -name 'app-*.log' -links 1 -mmin "+$(($remove_wait/60))" > /tmp/old.files
+
+        grep "Harvester started" /var/log/containers/app-*_elastic-agent_agent-* | sed -E 's#.+"@timestamp":"([^"]+)".+"source_file":"([^"]+)".+#\1\t\2#' | cat /tmp/opened.stats - | sort -u | tail -n 1000 > /tmp/opened.tmp
+        mv /tmp/opened.tmp /tmp/opened.stats
+        cat /tmp/opened.stats | awk '{print $2}' > /tmp/opened.files
+        
+        grep "close_inactive" /var/log/containers/app-*_elastic-agent_agent-* | sed -E 's#.+"@timestamp":"([^"]+)".+"source_file":"([^"]+)".+#\1\t\2#' | cat /tmp/closed.stats - | sort -u | tail -n 1000 > /tmp/closed.tmp
+        mv /tmp/closed.tmp /tmp/closed.stats
+        cat /tmp/closed.stats | awk '{print $2}' > /tmp/closed.files
+        
+        cat /tmp/old.files | grep -v -f /tmp/opened.files | xargs -r rm -f -v
+        cat /tmp/old.files | grep -f /tmp/closed.files | xargs -r rm -f -v
+
+        find /var/log/containers -type f -name 'app-*.log' -links 1 -mmin "+360" -printf '  Delete file %p\n' -delete
+
+        #end_ms=$(date +%s%3N)
+        #duration_ms=$((end_ms - start_ms))
+        #echo "loop end: $(date '+%Y-%m-%d %H:%M:%S.%3N'), duration: ${duration_ms}ms"
+
+        sleep "$sleep_duration"
+    done

@@ -1,0 +1,110 @@
+x-environment: &oncall-environment
+  DATABASE_TYPE: sqlite3
+  BROKER_TYPE: redis
+  BASE_URL: $DOMAIN
+  SECRET_KEY: $SECRET_KEY
+  REDIS_URI: redis://redis:6379/0
+  DJANGO_SETTINGS_MODULE: settings.hobby
+  CELERY_WORKER_QUEUE: "default,critical,long,slack,telegram,webhook,retry,celery"
+  CELERY_WORKER_CONCURRENCY: "1"
+  CELERY_WORKER_MAX_TASKS_PER_CHILD: "100"
+  CELERY_WORKER_SHUTDOWN_INTERVAL: "65m"
+  CELERY_WORKER_BEAT_ENABLED: "True"
+  GRAFANA_API_URL: http://grafana:3000
+
+services:
+  engine:
+    image: grafana/oncall:${ONCALL_DOCKER_VERSION:-latest}
+    restart: always
+    ports:
+      - "8080:8080"
+    command: >
+      sh -c "uwsgi --ini uwsgi.ini"
+    environment: *oncall-environment
+    volumes:
+      - /data/oncall:/var/lib/oncall
+    depends_on:
+      oncall_db_migration:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  celery:
+    image: grafana/oncall:${ONCALL_DOCKER_VERSION:-latest}
+    restart: always
+    command: sh -c "./celery_with_exporter.sh"
+    environment: *oncall-environment
+    volumes:
+      - /data/oncall:/var/lib/oncall
+    depends_on:
+      oncall_db_migration:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+
+  oncall_db_migration:
+    image: grafana/oncall:${ONCALL_DOCKER_VERSION:-latest}
+    command: python manage.py migrate --noinput
+    environment: *oncall-environment
+    volumes:
+      - /data/oncall:/var/lib/oncall
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7.0.5
+    restart: always
+    expose:
+      - 6379
+    volumes:
+      - redis_data:/data
+    deploy:
+      resources:
+        limits:
+          memory: 500m
+          cpus: "0.5"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      timeout: 5s
+      interval: 5s
+      retries: 10
+
+  grafana:
+    image: "grafana/grafana:${GRAFANA_VERSION:-latest}"
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: grafana-oncall-app
+      GF_INSTALL_PLUGINS: "grafana-oncall-app ${ONCALL_PLUGIN_VERSION},marcusolsson-dynamictext-panel ${DYNAMICTEXT_PLUGIN_VERSION}"
+      GF_SERVER_DOMAIN: logs.alltricks.sexy
+      GF_DATABASE_WAL: true
+      GF_FEATURE_TOGGLES_ENABLE: publicDashboards,externalServiceAccounts
+      GF_PANELS_DISABLE_SANITIZE_HTML: true
+      OC_API_TOKEN: ${ONCALL_API_TOKEN:-token}
+      GF_DATE_FORMATS_INTERVAL_DAY: "DD/MM"
+      GF_DATE_FORMATS_INTERVAL_HOUR: "DD/MM HH:mm"
+      GF_UNIFIED_ALERTING_RULE_VERSION_RECORD_LIMIT: "5"
+      GF_FEATURE_TOGGLES_ACCESS_CONTROL_ON_CALL: false
+      GF_AUTH_MANAGED_SERVICE_ACCOUNTS_ENABLED: true
+    volumes:
+      - /data/grafana:/var/lib/grafana
+      - /data/oncall:/var/lib/oncall
+    profiles:
+      - with_grafana
+    configs:
+      - source: grafana.ini
+        target: /etc/grafana/grafana.ini
+
+volumes:
+  oncall_data:
+  redis_data:
+
+configs:
+  grafana.ini:
+    content: |
+      [feature_toggles]
+      accessControlOnCall = false

@@ -1,0 +1,248 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ template "fullname" . }}{{ if .Values.blueGreen.enabled }}-{{- include "blueGreenToDeploy" . }}{{ end }}
+  {{- with .Values.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  labels:
+    app: {{ template "name" . }}
+    {{- include "labels" . | nindent 4 }}
+    {{- if .Values.blueGreen.enabled }}
+    blue-green: {{ include "blueGreenToDeploy" . }}
+    {{- end }}
+spec:
+  {{- with .Values.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if eq .Values.blueGreen.phase "clean" }}
+  replicas: 0
+  {{- else if and (.Values.blueGreen.enabled) (.Values.autoscaling.enabled) }}
+  replicas: {{ add .Values.replicaCount (div .Values.replicaCount 2) }}
+  {{- else if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "selectorLabels" . | nindent 6 }}
+      {{- if .Values.blueGreen.enabled }}
+      blue-green: {{ include "blueGreenToDeploy" . }}
+      {{ end }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "name" . }}
+        {{- include "selectorLabels" . | nindent 8 }}
+        {{- include "customLabels" . | nindent 8 }}
+        {{- if .Values.blueGreen.enabled }}
+        blue-green: {{ include "blueGreenToDeploy" . }}
+        {{ end }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+{{- if .Values.serviceAccount }}
+      serviceAccountName: "{{- if .Values.serviceAccount.name }}{{ .Values.serviceAccount.name }}{{- else if $.Values.serviceAccount.create }}{{ template "fullname" . }}{{- end }}"
+{{- end }}
+      volumes:
+{{- if .Values.nfs.enabled }}
+        - name: nfs-filer
+          nfs:
+            server: {{ .Values.nfs.host }}
+            path: {{ .Values.nfs.path }}
+{{- end }}
+{{- if .Values.global.configFiles }}
+        - name: config-files
+          configMap:
+            name: {{ template "fullname" . }}-config-files
+{{- end }}
+{{- if .Values.volumes }}
+        {{- toYaml .Values.volumes | nindent 8 }}
+{{- end }}
+      containers:
+        - name: {{ .Values.container.name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Values.global.git.commit }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: "{{ .Values.workingDir }}"
+          envFrom:
+            - configMapRef:
+                name: {{ template "fullname" . }}-env-var
+          env:
+            - name: NODE_HOST_IP
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: status.hostIP
+            - name: ELASTIC_APM_SERVER_URL
+              value: "http://$(NODE_HOST_IP):8222"
+          volumeMounts:
+{{- if .Values.nfs.enabled }}
+            - name: nfs-filer
+              mountPath: "/var/filer"
+{{- if .Values.nfs.subPath }}
+              subPath: "{{ .Values.nfs.subPath }}"
+{{- end }}
+{{- end }}
+{{- if .Values.global.configFiles }}
+          {{- range $name, $value := .Values.global.configFiles }}
+            - name: config-files
+              mountPath: {{ $value.mountPath | quote }}
+              subPath: {{ $value.subPath | quote }}
+          {{- end }}
+{{- end }}
+{{- if .Values.volumeMounts }}
+            {{- toYaml .Values.volumeMounts | nindent 12 }}
+{{- end }}
+          ports:
+            {{- range $name, $value := .Values.container.ports }}
+            {{- if $value }}
+            - name: {{ $name }}
+              containerPort: {{ $value }}
+            {{- end }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+{{- if .Values.livenessProbe }}
+          livenessProbe:
+          {{- if .Values.livenessProbe.httpGet }}
+            httpGet:
+              {{- toYaml .Values.livenessProbe.httpGet | nindent 14 }}
+          {{- else if .Values.livenessProbe.exec }}
+            exec:
+              {{- toYaml .Values.livenessProbe.exec | nindent 14 }}
+          {{- else if .Values.livenessProbe.tcpSocket }}
+            tcpSocket:
+              {{- toYaml .Values.livenessProbe.tcpSocket | nindent 14 }}
+          {{- end }}
+          {{- if .Values.livenessProbe.initialDelaySeconds }}
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+          {{- end }}
+          {{- if .Values.livenessProbe.periodSeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          {{- end }}
+          {{- if .Values.livenessProbe.timeoutSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+          {{- end }}
+          {{- if .Values.livenessProbe.successThreshold }}
+            successThreshold: {{ .Values.livenessProbe.successThreshold }}
+          {{- end }}
+          {{- if .Values.livenessProbe.failureThreshold }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+          {{- end }}
+{{- end }}
+{{- if .Values.readinessProbe }}
+          readinessProbe:
+          {{- if .Values.readinessProbe.httpGet }}
+            httpGet:
+              {{- toYaml .Values.readinessProbe.httpGet | nindent 14 }}
+          {{- else if .Values.readinessProbe.exec }}
+            exec:
+              {{- toYaml .Values.readinessProbe.exec | nindent 14 }}
+          {{- else if .Values.readinessProbe.tcpSocket }}
+            tcpSocket:
+              {{- toYaml .Values.readinessProbe.tcpSocket | nindent 14 }}
+          {{- end }}
+          {{- if .Values.readinessProbe.initialDelaySeconds }}
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+          {{- end }}
+          {{- if .Values.readinessProbe.periodSeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          {{- end }}
+          {{- if .Values.readinessProbe.timeoutSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+          {{- end }}
+          {{- if .Values.readinessProbe.successThreshold }}
+            successThreshold: {{ .Values.readinessProbe.successThreshold }}
+          {{- end }}
+          {{- if .Values.readinessProbe.failureThreshold }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+          {{- end }}
+{{- end }}
+{{- if .Values.startupProbe }}
+          startupProbe:
+          {{- if .Values.startupProbe.httpGet }}
+            httpGet:
+              {{- toYaml .Values.startupProbe.httpGet | nindent 14 }}
+          {{- else if .Values.startupProbe.exec }}
+            exec:
+              {{- toYaml .Values.startupProbe.exec | nindent 14 }}
+          {{- else if .Values.startupProbe.tcpSocket }}
+            tcpSocket:
+              {{- toYaml .Values.startupProbe.tcpSocket | nindent 14 }}
+          {{- end }}
+          {{- if .Values.startupProbe.periodSeconds }}
+            periodSeconds: {{ .Values.startupProbe.periodSeconds }}
+          {{- end }}
+          {{- if .Values.startupProbe.timeoutSeconds }}
+            timeoutSeconds: {{ .Values.startupProbe.timeoutSeconds }}
+          {{- end }}
+          {{- if .Values.startupProbe.successThreshold }}
+            successThreshold: {{ .Values.startupProbe.successThreshold }}
+          {{- end }}
+          {{- if .Values.startupProbe.failureThreshold }}
+            failureThreshold: {{ .Values.startupProbe.failureThreshold }}
+          {{- end }}
+{{- end }}
+{{- if .Values.memcached.enabled }}
+        - name: memcached
+          image: {{ .Values.memcached.image }}
+          command:
+            - memcached
+            - "-m {{ .Values.memcached.size }}"
+          ports:
+            - name: memcache
+              containerPort: 11211
+          livenessProbe:
+            tcpSocket:
+              port: memcache
+            initialDelaySeconds: 5
+            timeoutSeconds: 5
+          startupProbe:
+            tcpSocket:
+              port: memcache
+            periodSeconds: 10
+            failureThreshold: 30
+{{- if .Values.memcached.lifecycle }}
+          lifecycle:
+            {{- toYaml .Values.memcached.lifecycle | nindent 12 }}
+{{- end }}
+          resources:
+            {{- toYaml .Values.memcached.resources | nindent 12 }}
+{{- end }}
+      {{- with .Values.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.hostAliases }}
+      hostAliases:
+      {{- if kindIs "slice" . }}
+        {{- toYaml . | nindent 8 }}
+      {{- else }}
+      {{- range $name, $item := . }}
+        -
+        {{- $item | toYaml | nindent 10 }}
+      {{- end }}
+      {{- end }}
+      {{- end }}
+      terminationGracePeriodSeconds: 60
+      dnsConfig:
+        options:
+          - name: ndots
+            value: "2"

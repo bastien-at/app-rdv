@@ -1,0 +1,58 @@
+#!/bin/bash
+
+function _user() {
+  IFS=':' read -a param <<<$1
+
+  user="${param[0]}"
+  pass="${param[1]}"
+
+  if [ "${param[2]}" == "e" ]; then
+    chpasswdOptions="-e"
+  fi
+
+  adduser --gecos "" --home /home/$user --disabled-password --uid $nextuid --gid $SSH_USERS_COMMON_GROUP_ID --shell /usr/bin/mysecureshell $user
+  mkdir -p /home/$user
+  chown $user:$SSH_USERS_COMMON_GROUP_ID /home/$user
+  if [ ! -d /home/$user/sftp ]; then
+    mkdir -p /home/$user/sftp
+    chown $user:$SSH_USERS_COMMON_GROUP_ID /home/$user/sftp
+    chmod 770 /home/$user/sftp
+  elif stat -c '%A' /home/$user/sftp | grep -vP '^.....w' > /dev/null; then
+    chmod g+rw /home/$user/sftp
+  fi
+
+  if [ -n "$pass" ]; then
+    echo "$user:$pass" | chpasswd $chpasswdOptions
+  fi
+
+  if [ -f "/etc/ssh/users/keys/${user}.pub" ]; then
+    echo "add ssh key"
+    mkdir -p /home/$user/.ssh
+    chown $user:$SSH_USERS_COMMON_GROUP_ID /home/$user/.ssh
+    chmod 700 /home/$user/.ssh
+
+    echo "" >/home/$user/.ssh/authorized_keys
+    cat /etc/ssh/users/keys/$user.pub >> /home/$user/.ssh/authorized_keys
+    chown $user:$SSH_USERS_COMMON_GROUP_ID /home/$user/.ssh/authorized_keys
+    chmod 600 /home/$user/.ssh/authorized_keys
+  fi
+
+  nextuid=$((nextuid + 1))
+}
+
+nextuid=4001
+SSH_USERS_COMMON_GROUP_ID=${SSH_USERS_COMMON_GROUP_ID:-4000}
+
+if ! getent group $SSH_USERS_COMMON_GROUP_ID; then
+  addgroup --gid $SSH_USERS_COMMON_GROUP_ID ssh_common_group
+fi
+
+cat /etc/ssh/users/accounts | while read user; do
+  echo "Create user $user"
+  _user $user
+done
+
+chmod 600 /etc/ssh/host_keys/ssh_host_*
+chmod 644 /etc/ssh/host_keys/ssh_host_*.pub
+service mysecureshell start
+exec /usr/sbin/sshd -D -e

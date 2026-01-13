@@ -1,0 +1,24 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "images.fullname" . }}
+  labels:
+    {{- include "images.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml .Values.service.annotations | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  {{- if eq .Values.service.type "NodePort" }}
+  {{- if .Values.service.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ .Values.service.externalTrafficPolicy | quote }}
+  {{- end }}
+  {{- end }}
+  selector:
+    {{- include "images.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: proxy
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.port }}
+    - name: imgproxy
+      port: {{ .Values.service.imgproxyPort }}
+      targetPort: {{ .Values.service.imgproxyPort }}

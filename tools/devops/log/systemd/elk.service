@@ -1,0 +1,14 @@
+[Unit]
+Description=Service for ELK Stack
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/usr/local/bin/log
+ExecStart=/usr/bin/env /usr/bin/make up
+ExecStop=/usr/bin/env /usr/bin/make stop
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

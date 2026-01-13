@@ -1,0 +1,29 @@
+{{- if .Values.service.type }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "fullname" . }}
+  labels:
+    app: {{ template "name" . }}
+    {{- include "labels" . | nindent 4 }}
+  {{- with .Values.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  {{- if .Values.service.clusterIP }}
+  clusterIP: {{ .Values.service.clusterIP }}
+  {{ end }}
+  ports:
+    {{- range $name, $value := .Values.service.ports }}
+    - name: {{ $name }}
+      port: {{ $value }}
+      targetPort: {{ $name }}
+    {{- end }}
+  selector:
+    {{- if .Values.blueGreen.enabled }}
+    blue-green: {{ include "blueGreenToTrafficApp" . }}
+    {{ end }}
+    {{- include "selectorLabels" . | nindent 4 }}
+{{- end }}

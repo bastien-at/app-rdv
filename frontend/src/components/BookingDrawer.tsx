@@ -48,6 +48,8 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
   const [reportNotes, setReportNotes] = useState<string>('');
   const [reportPhotos, setReportPhotos] = useState<File[]>([]);
   const [reportSaving, setReportSaving] = useState(false);
+  const [internalNotes, setInternalNotes] = useState<string>('');
+  const [notesSaving, setNotesSaving] = useState(false);
   const [store, setStore] = useState<Store | null>(null);
 
   const getInspectionPhotoUrl = (photoUrl: string) => {
@@ -78,6 +80,7 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
 
     // Initialiser les champs éditables depuis la réservation
     setEditableServiceId(booking.service_id);
+    setInternalNotes(booking.internal_notes || '');
     
     if (booking.start_datetime) {
       try {
@@ -348,6 +351,44 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
 
   // ... (rest of functions) ...
 
+  const handleSaveInternalNotes = async () => {
+    if (!booking) return;
+
+    setNotesSaving(true);
+    try {
+      const { adminUpdateBookingStatus } = await import('../services/api');
+      await adminUpdateBookingStatus(booking.id, booking.status, internalNotes);
+      if (onUpdate) {
+        onUpdate();
+      }
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour des notes internes:', error);
+      alert('Erreur lors de la mise à jour des notes internes');
+    } finally {
+      setNotesSaving(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    if (!booking) return;
+    if (!window.confirm('Êtes-vous sûr de vouloir annuler cette réservation ?')) return;
+
+    setConfirmLoading(true);
+    try {
+      const { adminUpdateBookingStatus } = await import('../services/api');
+      await adminUpdateBookingStatus(booking.id, 'cancelled');
+      if (onUpdate) {
+        onUpdate();
+      }
+      onClose();
+    } catch (error) {
+      console.error('Erreur lors de l\'annulation de la réservation:', error);
+      alert('Erreur lors de l\'annulation de la réservation');
+    } finally {
+      setConfirmLoading(false);
+    }
+  };
+
   const generateSupportSheet = () => {
     if (!booking) return;
 
@@ -452,12 +493,12 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
     <>
       {/* Overlay */}
       <div 
-        className="fixed inset-0 bg-black/20 z-40 transition-opacity"
+        className="fixed inset-0 bg-black/40 z-[100] transition-opacity backdrop-blur-sm"
         onClick={onClose}
       />
 
       {/* Drawer */}
-      <div className="fixed right-0 top-0 bottom-0 w-[600px] bg-white shadow-2xl z-50 flex flex-col animate-slide-in-right">
+      <div className="fixed right-0 top-0 bottom-0 w-[600px] bg-white shadow-2xl z-[1000] flex flex-col animate-slide-in-right border-l border-gray-200">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
@@ -667,32 +708,83 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
             )}
 
             {/* Client */}
-            <div className="bg-gray-50 rounded-2xl p-6 space-y-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-gray-900">Client</h3>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+            <div className="bg-white rounded-2xl p-6 space-y-4 border border-gray-100 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="font-bold text-gray-900 flex items-center gap-2">
                   <User className="h-5 w-5 text-indigo-600" />
-                </div>
-                <div className="flex-1 space-y-1">
-                  <p className="text-sm text-gray-500">Nom</p>
-                  <p className="font-semibold text-gray-900">
+                  Client
+                </h3>
+              </div>
+              
+              <div className="grid grid-cols-1 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1">Nom Complet</p>
+                  <p className="font-semibold text-gray-900 text-lg">
                     {booking.customer_firstname} {booking.customer_lastname}
                   </p>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
                   {booking.customer_email && (
-                    <div className="flex items-center gap-2 text-sm text-gray-700 mt-2">
-                      <Mail className="h-4 w-4 text-gray-500" />
-                      <span>{booking.customer_email}</span>
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1 flex items-center gap-1">
+                        <Mail className="h-3 w-3" /> Email
+                      </p>
+                      <p className="text-sm text-gray-900 truncate">{booking.customer_email}</p>
                     </div>
                   )}
                   {booking.customer_phone && (
-                    <div className="flex items-center gap-2 text-sm text-gray-700">
-                      <Phone className="h-4 w-4 text-gray-500" />
-                      <span>{booking.customer_phone}</span>
+                    <div>
+                      <p className="text-xs text-gray-500 uppercase font-bold tracking-wider mb-1 flex items-center gap-1">
+                        <Phone className="h-3 w-3" /> Téléphone
+                      </p>
+                      <p className="text-sm text-gray-900">{booking.customer_phone}</p>
                     </div>
                   )}
                 </div>
+              </div>
+
+
+              {booking.customer_data?.notes && (
+                <div className="mt-4 pt-4 border-t border-gray-100">
+                  <div className="flex items-center gap-2 mb-2">
+                    <FileText className="h-4 w-4 text-blue-500" />
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Commentaire client (à la réservation)</p>
+                  </div>
+                  <div className="bg-blue-50/30 border border-blue-100 rounded-xl p-4 text-sm text-gray-700 italic leading-relaxed">
+                    "{booking.customer_data.notes}"
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Notes Internes (Commentaires admin) */}
+            <div className="bg-amber-50/50 rounded-2xl p-6 space-y-4 border border-amber-100 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Edit2 className="h-5 w-5 text-amber-600" />
+                  <h3 className="font-bold text-gray-900">Notes internes (privé)</h3>
+                </div>
+                {notesSaving && (
+                  <span className="text-[10px] text-amber-600 animate-pulse font-bold uppercase tracking-widest bg-white px-2 py-1 rounded-full border border-amber-200">
+                    Sync...
+                  </span>
+                )}
+              </div>
+              <p className="text-xs text-amber-700/70 mb-2 font-medium">
+                Ces notes sont **strictement confidentielles** et uniquement visibles par l'équipe.
+              </p>
+              <textarea
+                value={internalNotes}
+                onChange={(e) => setInternalNotes(e.target.value)}
+                onBlur={handleSaveInternalNotes}
+                placeholder="Ajouter une note interne (ex: montage spécifique, pièces réservées, rappel client nécessaire...)"
+                className="w-full h-32 px-4 py-3 border border-amber-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white placeholder:text-amber-300 shadow-inner"
+              />
+              <div className="flex justify-end">
+                <p className="text-[10px] text-amber-500/60 italic font-medium">
+                  ✓ Sauvegarde automatique
+                </p>
               </div>
             </div>
 
@@ -790,16 +882,11 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
                 fullWidth
                 variant="ghost"
                 className="border-2 border-red-300 text-red-600 hover:bg-red-50 hover:border-red-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                onClick={() => {
-                  if (window.confirm('Êtes-vous sûr de vouloir annuler cette réservation ?')) {
-                    // TODO: API call
-                    console.log('Annulation de la réservation:', booking.id);
-                  }
-                }}
-                disabled={hasReceptionReport}
+                onClick={handleCancel}
+                disabled={hasReceptionReport || confirmLoading}
               >
                 <XCircle className="h-4 w-4 mr-2" />
-                Annuler la réservation
+                {confirmLoading ? 'Annulation...' : 'Annuler la réservation'}
               </Button>
             )}
           </div>

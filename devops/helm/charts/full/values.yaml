@@ -1,0 +1,14 @@
+generic-application:
+  nameOverride: full
+
+  workingDir: /var/www
+
+  labels:
+    app-type: web
+
+  serviceAccount:
+    name: booking
+    create: true
+
+  test:
+    host: ""

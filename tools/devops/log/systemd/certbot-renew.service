@@ -1,0 +1,13 @@
+[Unit]
+Description=Certbot Renewal Service for ELK Stack
+Requires=docker.service
+After=network.target docker.service
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/usr/local/bin/log
+ExecStart=/bin/bash /usr/local/bin/log/scripts/certbot.sh renew
+
+[Install]
+WantedBy=multi-user.target

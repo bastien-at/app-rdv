@@ -1,0 +1,66 @@
+{% set annotations = payload.get("commonAnnotations", {}).copy() -%}
+{% set groupLabels = payload.get("groupLabels", {}) -%}
+{% set commonLabels = payload.get("commonLabels", {}) -%}
+{% set severity = groupLabels.severity -%}
+{% set legacyLabels = payload.get("labels", {}) -%}
+{% set legacyAnnotations = payload.get("annotations", {}) -%}
+
+{% if severity -%}
+{% set severity_emoji = {"critical": ":rotating_light:", "warning": ":warning:" }[severity] | default(":question:") -%}
+Severity: {{ severity }} {{ severity_emoji }}
+{% endif -%}
+
+{% set status = payload.get("status", "Unknown") -%}
+{% set status_emoji = {"firing": ":fire:", "resolved": ":white_check_mark:"}[status] | default(":warning:") -%}
+Status: {{ status }} {{ status_emoji }} (on the source)
+{% if status == "firing" and payload.numFiring -%}
+Firing alerts – {{ payload.numFiring }}
+Resolved alerts – {{ payload.numResolved }}
+{% endif -%}
+
+{% if "runbook_url" in annotations -%}
+[:book: Runbook:link:]({{ annotations.runbook_url }})
+{% set _ = annotations.pop('runbook_url') -%}
+{% endif -%}
+
+{% if "runbook_url_internal" in annotations -%}
+[:closed_book: Runbook (internal):link:]({{ annotations.runbook_url_internal }})
+{% set _ = annotations.pop('runbook_url_internal') -%}
+{% endif %}
+
+{%- if groupLabels | length > 0 %}
+GroupLabels:
+{% for k, v in groupLabels.items() -%}
+- {{ k }}: {{ v }}
+{% endfor %}
+{% endif -%}
+
+{% if commonLabels | length > 0 -%}
+CommonLabels:
+{% for k, v in commonLabels.items() -%}
+- {{ k }}: {{ v }}
+{% endfor %}
+{% endif -%}
+
+{% if annotations | length > 0 -%}
+Annotations:
+{% for k, v in annotations.items() -%}
+- {{ k }}: {{ v }}
+{% endfor %}
+{% endif -%}
+
+{# backward compatibility with legacy alertmanager integration -#}
+{% if legacyLabels | length > 0 -%}
+Labels:
+{% for k, v in legacyLabels.items() -%}
+- {{ k }}: {{ v }}
+{% endfor %}
+{% endif -%}
+
+{% if legacyAnnotations | length > 0 -%}
+Annotations:
+{% for k, v in legacyAnnotations.items() -%}
+- {{ k }}: {{ v }}
+{% endfor %}
+{% endif -%}
+[View in AlertManager]({{ source_link }})

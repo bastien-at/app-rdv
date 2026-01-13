@@ -567,7 +567,7 @@ export const updateBookingStatus = async (
 
     const result = await query<Booking>(
       `UPDATE bookings 
-       SET status = $1, internal_notes = COALESCE($2, internal_notes)
+       SET status = $1, internal_notes = COALESCE($2, internal_notes), updated_at = NOW()
        WHERE id = $3
        RETURNING *`,
       [status, internal_notes || null, id],
@@ -581,9 +581,46 @@ export const updateBookingStatus = async (
       return;
     }
 
+    const booking = result.rows[0];
+
+    // Si le nouveau statut est "annulé", envoyer l'email d'annulation
+    if (status === 'cancelled') {
+      try {
+        const detailsResult = await query<BookingWithDetails>(
+          `SELECT 
+            b.*,
+            srv.name as service_name,
+            srv.service_type,
+            srv.price as service_price,
+            srv.duration_minutes as service_duration,
+            st.name as store_name,
+            st.address as store_address,
+            st.city as store_city,
+            st.postal_code as store_postal_code,
+            st.phone as store_phone,
+            st.email as store_email,
+            t.name as technician_name
+          FROM bookings b
+          JOIN services srv ON b.service_id = srv.id
+          JOIN stores st ON b.store_id = st.id
+          LEFT JOIN technicians t ON b.technician_id = t.id
+          WHERE b.id = $1`,
+          [id],
+        );
+
+        if (detailsResult.rows.length > 0) {
+          const { sendCancellationEmail } = require('../utils/email');
+          await sendCancellationEmail(detailsResult.rows[0]);
+        }
+      } catch (emailError) {
+        console.error('Erreur lors de l\'envoi de l\'email d\'annulation (admin):', emailError);
+        // On ne bloque pas la réponse si l'email échoue
+      }
+    }
+
     res.json({
       success: true,
-      data: result.rows[0],
+      data: booking,
       message: 'Statut mis à jour avec succès',
     });
   } catch (error) {

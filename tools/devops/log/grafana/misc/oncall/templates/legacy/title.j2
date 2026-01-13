@@ -1,0 +1,35 @@
+{%- set alertname = payload.get("labels", {}).get("alertname") %}
+{%- set rulename = payload.get("labels", {}).get("rulename", alertname) %}
+{%- set group = [] %}
+{%- set grouplabels = payload.get("labels", {}).get("alert_group", "no").split(',') %}
+{%- for grouplabel in grouplabels -%}
+  {{ group.append(payload.get("labels", {}).get(grouplabel, "no")) or "" }}
+{%- endfor %}
+{%- set group = group|join(' - ') %}
+{%- set reason = payload.get("annotations", {}).get("grafana_state_reason", "") %}
+{%- set description = payload.get("annotations", {}).get("description", "seuil franchi") %}
+{%- set error = payload.get("annotations", {}).get("Error", "") %}
+{%- if alertname == "DatasourceNoData" or reason == "NoData" %}
+  {%- set finalreason = 'Aucune donnée' %}
+{%- elif alertname == "DatasourceError" or reason == "Error" %}
+  {%- set finalreason = 'Erreur d’exécution de la règle (' + error + ')' %}
+{%- elif description != "-" %}
+  {%- set finalreason = description %}
+  {%- if reason == "MissingSeries" %}
+    {%- set finalreason = finalreason + ' (plus de donnée sur la série)' %}
+  {%- elif reason == "Updated" %}
+    {%- set finalreason = finalreason + ' (règle mise à jour)' %}
+  {%- endif %}
+{%- elif reason == "Updated" %}
+  {%- set finalreason = 'Règle mise à jour' %}
+{%- elif reason == "MissingSeries" %}
+  {%- set finalreason = 'Plus de donnée sur la série' %}
+{%- endif %}
+
+{{- payload.get("labels", {}).get("grafana_folder") }} - {{ rulename }}
+{%- if group and group != "no" %}
+ | Cible : {{ group }}
+{%- endif %}
+{%- if finalreason %}
+ | Motif : {{ finalreason }}
+{%- endif %}

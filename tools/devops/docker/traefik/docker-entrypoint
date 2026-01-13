@@ -1,0 +1,9 @@
+#!/bin/sh
+# Copy of original image entrypoint
+# Just add sed to replace env var
+# Certainly not the better way, but in urgency...
+set -e
+
+grep -irl "__avanis_app__" /etc/traefik/traefik.yml | xargs -r sed -i "s/__avanis_app__/${CONTAINERS_PREFIX}/gi"
+
+exec /entrypoint.sh "$@"

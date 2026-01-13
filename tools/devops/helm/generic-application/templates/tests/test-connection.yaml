@@ -1,0 +1,40 @@
+{{- if and .Values.test.host (gt (int .Values.replicaCount) 0) -}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ template "fullname" . }}-test-connection
+  labels:
+    app: {{ template "name" . }}
+    {{- include "labels" . | nindent 4 }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  containers:
+    - name: check-commit
+      image: curlimages/curl
+      command:
+        - /bin/sh
+        - -c
+        - |
+          counter=0
+          while [ $counter -lt 300 ] && [ "$(curl -s --header "Host:{{ .Values.test.host }}" -H "X-Forwarded-Proto: https" http://{{ template "fullname" . }}:{{ .Values.test.port }}/{{ .Values.test.file }} | xargs)" != "{{ .Values.test.deployCheckId }}" ]; do
+            counter=$((counter+1))
+            echo "Wait new container is up ($counter)..."
+            sleep 2
+          done
+          [ $counter -eq 300 ] && exit 1 || exit 0
+  restartPolicy: Never
+  {{- with .Values.nodeSelector }}
+  nodeSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.affinity }}
+  affinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tolerations }}
+  tolerations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}
