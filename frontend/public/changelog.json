@@ -1,6 +1,11 @@
 {
-  "generatedAt": "2026-01-13T16:21:00.000Z",
+  "generatedAt": "2026-01-13T16:33:00.000Z",
   "entries": [
+    {
+      "hash": "71dc7b7",
+      "message": "fix: calendar day alignment in ModernBookingPage and BookingSection",
+      "date": "2026-01-13"
+    },
     {
       "hash": "eec38e2",
       "message": "fix: resolve git conflicts in adminController.ts and merge availability block logic",
@@ -24,11 +29,6 @@
     {
       "hash": "eefd892",
       "message": "chore: resolve conflict in server.ts keeping old rate limit version",
-      "date": "2026-01-12"
-    },
-    {
-      "hash": "c8c0a21",
-      "message": "feat: separation des capacités atelier et étude posturale, correction routage clients et optimisation rate limit",
       "date": "2026-01-12"
     }
   ]
