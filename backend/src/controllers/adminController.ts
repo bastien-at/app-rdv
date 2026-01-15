@@ -297,7 +297,7 @@ export const adminUpdateAndConfirmBooking = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { service_id, start_datetime, technician_id, internal_notes, duration } = req.body;
+    const { service_id, start_datetime, technician_id, internal_notes, public_notes, duration } = req.body;
 
     const existingResult = await query<Booking>(
       'SELECT * FROM bookings WHERE id = $1',
@@ -346,8 +346,9 @@ export const adminUpdateAndConfirmBooking = async (
            end_datetime = $3,
            technician_id = COALESCE($4, technician_id),
            status = 'confirmed',
-           internal_notes = COALESCE($5, internal_notes)
-       WHERE id = $6
+           internal_notes = $5,
+           public_notes = $6
+       WHERE id = $7
        RETURNING *`,
       [
         newServiceId,
@@ -355,6 +356,7 @@ export const adminUpdateAndConfirmBooking = async (
         newEnd,
         technician_id || null,
         internal_notes || null,
+        public_notes || null,
         id,
       ],
     );
@@ -491,6 +493,7 @@ export const getStoreBookings = async (
         srv.name as service_name,
         srv.service_type as service_type,
         srv.price as service_price,
+        srv.duration_minutes as service_duration,
         t.name as technician_name
       FROM bookings b
       JOIN services srv ON b.service_id = srv.id
@@ -563,14 +566,17 @@ export const updateBookingStatus = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { status, internal_notes } = req.body;
+    const { status, internal_notes, public_notes } = req.body;
 
     const result = await query<Booking>(
       `UPDATE bookings 
-       SET status = $1, internal_notes = COALESCE($2, internal_notes), updated_at = NOW()
-       WHERE id = $3
+       SET status = $1, 
+           internal_notes = $2, 
+           public_notes = $3,
+           updated_at = NOW()
+       WHERE id = $4
        RETURNING *`,
-      [status, internal_notes || null, id],
+      [status, internal_notes || null, public_notes || null, id],
     );
 
     if (result.rows.length === 0) {
@@ -628,6 +634,81 @@ export const updateBookingStatus = async (
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la mise à jour du statut',
+    });
+  }
+};
+
+/**
+ * Termine une réservation et envoie un email personnalisé
+ */
+export const completeBooking = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { templateId, customMessage, internal_notes, public_notes } = req.body;
+
+    // 1. Mettre à jour le statut en 'completed'
+    const updateResult = await query<Booking>(
+      `UPDATE bookings 
+       SET status = 'completed', 
+           internal_notes = $1, 
+           public_notes = $2,
+           updated_at = NOW()
+       WHERE id = $3
+       RETURNING *`,
+      [internal_notes || null, public_notes || null, id],
+    );
+
+    if (updateResult.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: 'Réservation non trouvée',
+      });
+      return;
+    }
+
+    const booking = updateResult.rows[0];
+
+    // 2. Récupérer les détails complets pour l'email
+    const detailsResult = await query<BookingWithDetails>(
+      `SELECT 
+        b.*,
+        srv.name as service_name,
+        srv.service_type,
+        srv.price as service_price,
+        srv.duration_minutes as service_duration,
+        st.name as store_name,
+        st.address as store_address,
+        st.city as store_city,
+        st.postal_code as store_postal_code,
+        st.phone as store_phone,
+        st.email as store_email,
+        t.name as technician_name
+      FROM bookings b
+      JOIN services srv ON b.service_id = srv.id
+      JOIN stores st ON b.store_id = st.id
+      LEFT JOIN technicians t ON b.technician_id = t.id
+      WHERE b.id = $1`,
+      [id],
+    );
+
+    if (detailsResult.rows.length > 0) {
+      const { sendCustomCompletionEmail } = require('../utils/email');
+      await sendCustomCompletionEmail(detailsResult.rows[0], templateId, customMessage);
+    }
+
+    res.json({
+      success: true,
+      data: booking,
+      message: 'Réservation terminée et email envoyé',
+    });
+  } catch (error) {
+    console.error('Erreur lors de la clôture de la réservation:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la clôture de la réservation',
     });
   }
 };

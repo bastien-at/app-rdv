@@ -8,6 +8,7 @@ import {
   getStoreBookings,
   updateBookingStatus,
   adminUpdateAndConfirmBooking,
+  completeBooking,
   getStoreAvailabilityBlocks,
   createAvailabilityBlock,
   deleteAvailabilityBlock,
@@ -55,6 +56,9 @@ router.put('/bookings/:id/status', validateUpdateStatus, updateBookingStatus);
 
 // PUT /api/admin/bookings/:id/confirm - Mettre à jour et confirmer une réservation
 router.put('/bookings/:id/confirm', validateAdminUpdateAndConfirmBooking, adminUpdateAndConfirmBooking);
+
+// POST /api/admin/bookings/:id/complete - Terminer une réservation et envoyer un mail
+router.post('/bookings/:id/complete', completeBooking);
 
 // POST /api/admin/bookings/:id/reception-report - Enregistrer un état des lieux
 router.post('/bookings/:id/reception-report', saveReceptionReport);

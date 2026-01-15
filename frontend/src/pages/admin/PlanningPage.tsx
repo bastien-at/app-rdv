@@ -60,6 +60,7 @@ interface Booking {
   customer_phone?: string;
   customer_data?: any;
   internal_notes?: string;
+  public_notes?: string;
   created_at?: string;
   booking_token?: string;
 }
@@ -245,6 +246,7 @@ export default function PlanningPage() {
         customer_phone: b.customer_phone,
         customer_data: b.customer_data,
         internal_notes: b.internal_notes,
+        public_notes: b.public_notes,
         created_at: b.created_at,
         booking_token: b.booking_token,
       }));

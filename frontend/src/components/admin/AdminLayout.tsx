@@ -71,6 +71,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     sessionStorage.removeItem('admin_role');
     sessionStorage.removeItem('admin_store_id');
 
+    // Supprimer les cookies de connexion si présents
+    document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+
     navigate('/admin/login');
   };
 

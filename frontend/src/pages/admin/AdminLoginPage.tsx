@@ -16,6 +16,15 @@ type ChangelogData = {
   entries: ChangelogEntry[];
 };
 
+interface AppInfo {
+  version: string;
+  changelog?: Array<{
+    version: string;
+    date?: string;
+    changes?: string[];
+  }>;
+}
+
 export default function AdminLoginPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -27,7 +36,7 @@ export default function AdminLoginPage() {
 
   const getLatestVersion = (info: AppInfo | null) => {
     if (!info) return null;
-    const versions = (info.changelog || []).map((c) => c.version).filter(Boolean);
+    const versions = (info.changelog || []).map((c: any) => c.version).filter(Boolean);
     if (versions.length === 0) return info.version || null;
 
     const parse = (v: string) => v.split('.').map((x) => Number.parseInt(x, 10) || 0);
@@ -47,6 +56,12 @@ export default function AdminLoginPage() {
   };
 
   useEffect(() => {
+    // Rediriger vers le dashboard si déjà connecté
+    const token = localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token');
+    if (token) {
+      navigate('/admin/planning');
+    }
+
     let isMounted = true;
 
     const loadAppInfo = async () => {

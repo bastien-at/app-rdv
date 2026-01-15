@@ -1,8 +1,16 @@
+require('dotenv').config();
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
 async function migrate() {
+  if (!process.env.DATABASE_URL) {
+    console.error(
+      "❌ Erreur: DATABASE_URL n'est pas définie dans le fichier .env",
+    );
+    process.exit(1);
+  }
+
   const pool = new Pool({
     connectionString: process.env.DATABASE_URL,
   });
@@ -18,103 +26,41 @@ async function migrate() {
     // 1. Schéma de base
     await pool.query(schemaSQL);
 
-    // 2. Migrations incrémentales
-    const enhanceServicesPath = path.join(
-      __dirname,
-      'migrations',
+    // Liste des migrations SQL à appliquer dans l'ordre
+    const sqlMigrations = [
       '002_enhance_services.sql',
-    );
-    if (fs.existsSync(enhanceServicesPath)) {
-      const enhanceServicesSQL = fs.readFileSync(enhanceServicesPath, 'utf8');
-      await pool.query(enhanceServicesSQL);
-      console.log(' Migration 002_enhance_services.sql appliquée');
-    } else {
-      console.warn(
-        ' Migration 002_enhance_services.sql non trouvée, colonnes avancées des services non appliquées',
-      );
-    }
-
-    // 3. Migration 006 - Rôles admin
-    const adminRolesPath = path.join(
-      __dirname,
-      'migrations',
       '006_add_admin_roles.sql',
-    );
-    if (fs.existsSync(adminRolesPath)) {
-      const adminRolesSQL = fs.readFileSync(adminRolesPath, 'utf8');
-      await pool.query(adminRolesSQL);
-      console.log(' Migration 006_add_admin_roles.sql appliquée');
-    } else {
-      console.warn(
-        ' Migration 006_add_admin_roles.sql non trouvée, rôles admin non appliqués',
-      );
-    }
-
-    // 4. Migration 007 - Annuaire des clients
-    const customerDirectoryPath = path.join(
-      __dirname,
-      'migrations',
       '007_add_customer_directory.sql',
-    );
-    if (fs.existsSync(customerDirectoryPath)) {
-      const customerDirectorySQL = fs.readFileSync(
-        customerDirectoryPath,
-        'utf8',
-      );
-      await pool.query(customerDirectorySQL);
-      console.log(' Migration 007_add_customer_directory.sql appliquée');
-    } else {
-      console.warn(
-        ' Migration 007_add_customer_directory.sql non trouvée, annuaire des clients non appliqué',
-      );
-    }
-
-    // 5. Migration 008 - Types de services (Atelier/Étude)
-    const storeServiceTypesPath = path.join(
-      __dirname,
-      'migrations',
       '008_add_store_service_types.sql',
-    );
-    if (fs.existsSync(storeServiceTypesPath)) {
-      const storeServiceTypesSQL = fs.readFileSync(
-        storeServiceTypesPath,
-        'utf8',
-      );
-      await pool.query(storeServiceTypesSQL);
-      console.log(' Migration 008_add_store_service_types.sql appliquée');
-    } else {
-      console.warn(' Migration 008_add_store_service_types.sql non trouvée');
-    }
-
-    // 6. Migration 009 - Capacité de l'atelier
-    const workshopCapacityPath = path.join(
-      __dirname,
-      'migrations',
       '009_add_workshop_capacity.sql',
-    );
-    if (fs.existsSync(workshopCapacityPath)) {
-      const workshopCapacitySQL = fs.readFileSync(workshopCapacityPath, 'utf8');
-      await pool.query(workshopCapacitySQL);
-      console.log(' Migration 009_add_workshop_capacity.sql appliquée');
-    } else {
-      console.warn(' Migration 009_add_workshop_capacity.sql non trouvée');
-    }
-
-    // 7. Migration 010 - Password Reset
-    const passwordResetPath = path.join(
-      __dirname,
-      'migrations',
       '010_add_password_reset.sql',
-    );
-    if (fs.existsSync(passwordResetPath)) {
-      const passwordResetSQL = fs.readFileSync(passwordResetPath, 'utf8');
-      await pool.query(passwordResetSQL);
-      console.log(' Migration 010_add_password_reset.sql appliquée');
-    } else {
-      console.warn(' Migration 010_add_password_reset.sql non trouvée');
+      '011_add_fitting_capacity.sql',
+      '012_add_block_quantity.sql',
+      '013_add_public_notes_to_bookings.sql',
+    ];
+
+    for (const migrationFile of sqlMigrations) {
+      const migrationPath = path.join(__dirname, 'migrations', migrationFile);
+      if (fs.existsSync(migrationPath)) {
+        const migrationSQL = fs.readFileSync(migrationPath, 'utf8');
+        try {
+          await pool.query(migrationSQL);
+          console.log(`✅ Migration ${migrationFile} appliquée`);
+        } catch (err) {
+          if (err.code === '42710' || err.code === '42701') {
+            console.log(
+              `ℹ️ Migration ${migrationFile} déjà appliquée (colonne ou contrainte existante)`,
+            );
+          } else {
+            throw err;
+          }
+        }
+      } else {
+        console.warn(`⚠️ Migration ${migrationFile} non trouvée`);
+      }
     }
 
-    // 8. Tables inspections
+    // Migration spécifique inspections
     const inspectionTablesPath = path.join(
       __dirname,
       'add-inspection-tables.sql',
@@ -122,14 +68,12 @@ async function migrate() {
     if (fs.existsSync(inspectionTablesPath)) {
       const inspectionTablesSQL = fs.readFileSync(inspectionTablesPath, 'utf8');
       await pool.query(inspectionTablesSQL);
-      console.log(' Migration add-inspection-tables.sql appliquée');
-    } else {
-      console.warn(' Migration add-inspection-tables.sql non trouvée');
+      console.log('✅ Migration add-inspection-tables.sql appliquée');
     }
 
-    console.log(' Migration terminée avec succès!');
+    console.log('🚀 Migration terminée avec succès!');
   } catch (error) {
-    console.error(' Erreur lors de la migration:', error);
+    console.error('❌ Erreur lors de la migration:', error);
     process.exit(1);
   } finally {
     await pool.end();

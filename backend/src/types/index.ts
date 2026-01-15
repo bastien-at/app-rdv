@@ -113,6 +113,7 @@ export interface Booking {
   customer_phone: string;
   customer_data: CustomerData;
   internal_notes?: string;
+  public_notes?: string;
   created_at: Date;
   updated_at: Date;
   cancelled_at?: Date;

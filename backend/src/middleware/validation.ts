@@ -106,6 +106,7 @@ export const validateUpdateStatus = [
     .isIn(['pending', 'confirmed', 'completed', 'cancelled', 'no_show'])
     .withMessage('Statut invalide'),
   body('internal_notes').optional().trim(),
+  body('public_notes').optional().trim(),
   validate,
 ];
 
@@ -118,5 +119,6 @@ export const validateAdminUpdateAndConfirmBooking = [
   body('start_datetime').optional().isISO8601().withMessage('Date/heure invalide'),
   body('technician_id').optional().isUUID().withMessage('ID technicien invalide'),
   body('internal_notes').optional().trim(),
+  body('public_notes').optional().trim(),
   validate,
 ];

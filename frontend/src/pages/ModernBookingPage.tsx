@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Clock, User, Calendar as CalendarIcon, Mail, Phone, Bike, Wrench, Check, MapPin, Search, HelpCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, User, Calendar as CalendarIcon, Mail, Phone, Bike, Wrench, Check, MapPin, Search, HelpCircle, LayoutDashboard } from 'lucide-react';
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, isBefore, startOfDay, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Button from '../components/Button';
@@ -58,16 +58,13 @@ export default function ModernBookingPage() {
   useEffect(() => {
     const checkAdmin = () => {
       const token = localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token');
-      const sourceFromUrl = searchParams.get('source') === 'admin';
-      const isCurrentlyAdmin = !!token || sourceFromUrl;
-      
-      setIsAdmin(isCurrentlyAdmin);
+      setIsAdmin(!!token);
     };
 
     checkAdmin();
     window.addEventListener('storage', checkAdmin);
     return () => window.removeEventListener('storage', checkAdmin);
-  }, [searchParams]);
+  }, []);
 
   // Customer search with abort controller
   useEffect(() => {
@@ -325,7 +322,7 @@ export default function ModernBookingPage() {
   };
 
   const handleBack = () => {
-    if (step === 'form' && Object.values(formData).some(v => v && v !== 'own' && v !== false)) {
+    if (step === 'form' && Object.values(formData).some((v) => v !== '' && v !== 'own' && v !== false)) {
       if (!confirm('Voulez-vous vraiment quitter ? Les données saisies seront perdues.')) return;
     }
     navigate(-1);
@@ -424,7 +421,18 @@ export default function ModernBookingPage() {
             />
           </div>
 
-          <div className="w-[180px]" />
+          <div className="w-[180px] flex justify-end gap-2">
+            {isAdmin && (
+              <button
+                onClick={() => navigate('/admin/planning')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white font-bold text-sm border border-white/20"
+                title="Accéder au planning admin"
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                <span className="hidden md:inline">Planning</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 

@@ -434,8 +434,12 @@ async function getBookingDetails(bookingId: string): Promise<BookingWithDetails>
     `SELECT 
       b.*,
       s.name as store_name,
+      s.address as store_address,
+      s.postal_code as store_postal_code,
+      s.city as store_city,
       srv.name as service_name,
       srv.price as service_price,
+      srv.duration_minutes as service_duration,
       t.name as technician_name
     FROM bookings b
     JOIN stores s ON b.store_id = s.id

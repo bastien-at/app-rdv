@@ -140,6 +140,7 @@ export interface AdminConfirmBookingPayload {
   start_datetime?: string;
   technician_id?: string;
   internal_notes?: string;
+  public_notes?: string;
   duration?: number;
 }
 
@@ -152,9 +153,25 @@ export const adminConfirmBooking = async (id: string, payload?: AdminConfirmBook
   });
 };
 
-export const adminUpdateBookingStatus = async (id: string, status: string, internal_notes?: string): Promise<void> => {
+export const adminUpdateBookingStatus = async (id: string, status: string, internal_notes?: string, public_notes?: string): Promise<void> => {
   const token = getAdminToken();
-  await api.put(`/admin/bookings/${id}/status`, { status, internal_notes }, {
+  await api.put(`/admin/bookings/${id}/status`, { status, internal_notes, public_notes }, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+};
+
+export interface AdminCompleteBookingPayload {
+  templateId: string;
+  customMessage?: string;
+  internal_notes?: string;
+  public_notes?: string;
+}
+
+export const adminCompleteBooking = async (id: string, payload: AdminCompleteBookingPayload): Promise<void> => {
+  const token = getAdminToken();
+  await api.post(`/admin/bookings/${id}/complete`, payload, {
     headers: {
       Authorization: `Bearer ${token}`,
     },

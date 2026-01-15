@@ -148,6 +148,7 @@ export interface Booking {
   service_duration?: number;
   technician_name?: string;
   internal_notes?: string;
+  public_notes?: string;
   created_at: string;
   updated_at: string;
 }
