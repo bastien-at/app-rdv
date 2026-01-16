@@ -381,11 +381,13 @@ export default function PlanningPage() {
       ).filter((day) => day.getDay() !== 0);
     }
 
-    // Vue mois : on génère tous les jours puis on supprime les dimanches
-    return eachDayOfInterval({
-      start: startOfMonth(currentDate),
-      end: endOfMonth(currentDate),
-    }).filter((day) => day.getDay() !== 0);
+    // Vue mois : on aligne sur des semaines complètes (lundi -> samedi) pour éviter les décalages
+    const monthStart = startOfMonth(currentDate);
+    const monthEnd = endOfMonth(currentDate);
+    const start = startOfWeek(monthStart, { weekStartsOn: 1 });
+    const end = endOfWeek(monthEnd, { weekStartsOn: 1 });
+
+    return eachDayOfInterval({ start, end }).filter((day) => day.getDay() !== 0);
   };
 
   const getBookingsForDay = (day: Date) => {
@@ -1025,9 +1027,9 @@ export default function PlanningPage() {
               <div className="overflow-x-auto">
                 {viewMode === 'month' ? (
                   // Vue mois
-                  <div className="grid grid-cols-7 gap-px bg-gray-200">
+                  <div className="grid grid-cols-6 gap-px bg-gray-200">
                     {/* Header jours */}
-                    {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(
+                    {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'].map(
                       (day) => (
                         <div
                           key={day}
