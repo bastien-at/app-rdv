@@ -178,6 +178,38 @@ export const adminCompleteBooking = async (id: string, payload: AdminCompleteBoo
   });
 };
 
+export type AdminImportBookingsResult = {
+  created: number;
+  updated: number;
+  skipped: { line: number; reason: string }[];
+  errors: { line: number; reason: string }[];
+};
+
+export const adminImportBookingsTsv = async (
+  file: File,
+  storeId: string,
+  mode: 'update' | 'skip' = 'update',
+): Promise<AdminImportBookingsResult> => {
+  const token = getAdminToken();
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('store_id', storeId);
+  formData.append('mode', mode);
+
+  const { data } = await api.post<ApiResponse<AdminImportBookingsResult>>(
+    '/admin/bookings/import-tsv',
+    formData,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data',
+      },
+    },
+  );
+
+  return data.data!;
+};
+
 // Etat des lieux (réception)
 export const saveReceptionReport = async (
   bookingId: string,

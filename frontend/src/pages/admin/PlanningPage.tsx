@@ -33,7 +33,12 @@ import Card from '../../components/Card';
 import Button from '../../components/Button';
 import Badge from '../../components/Badge';
 import BookingDrawer from '../../components/BookingDrawer';
-import { getAdminToken, adminConfirmBooking } from '../../services/api';
+import {
+  getAdminToken,
+  adminConfirmBooking,
+  adminImportBookingsTsv,
+  type AdminImportBookingsResult,
+} from '../../services/api';
 
 interface Store {
   id: string;
@@ -118,6 +123,11 @@ export default function PlanningPage() {
     hour: number;
     minutes?: number;
   } | null>(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importMode, setImportMode] = useState<'update' | 'skip'>('update');
+  const [importResult, setImportResult] = useState<AdminImportBookingsResult | null>(null);
+  const [importLoading, setImportLoading] = useState(false);
 
   const getAdminStoreId = (): string | null => {
     if (typeof window === 'undefined') return null;
@@ -196,6 +206,22 @@ export default function PlanningPage() {
       }
     } catch (error) {
       console.error('Erreur chargement magasins:', error);
+    }
+  };
+
+  const handleImportTsv = async () => {
+    if (!importFile || !selectedStore) return;
+    setImportLoading(true);
+    setImportResult(null);
+    try {
+      const result = await adminImportBookingsTsv(importFile, selectedStore, importMode);
+      setImportResult(result);
+      await loadBookings();
+    } catch (error) {
+      console.error('Erreur import TSV:', error);
+      alert("Erreur lors de l'import TSV");
+    } finally {
+      setImportLoading(false);
     }
   };
 
@@ -1003,7 +1029,17 @@ export default function PlanningPage() {
               </div>
 
               {/* CTA création créneau */}
-              <div className="flex justify-end">
+              <div className="flex justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowImportModal(true);
+                    setImportResult(null);
+                  }}
+                >
+                  Importer TSV
+                </Button>
                 <Button
                   variant="primary"
                   size="sm"
@@ -1489,6 +1525,118 @@ export default function PlanningPage() {
                   Fermer
                 </Button>
                 <Button fullWidth>Enregistrer</Button>
+              </div>
+            </Card>
+          </div>
+        )}
+
+        {/* Modal import TSV */}
+        {showImportModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[100] p-4 backdrop-blur-sm">
+            <Card className="max-w-xl w-full p-6 shadow-2xl border-0">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold">Importer un TSV</h3>
+                <button
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setImportFile(null);
+                    setImportResult(null);
+                  }}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700">
+                    Fichier TSV
+                  </label>
+                  <input
+                    type="file"
+                    accept=".tsv,text/tab-separated-values,text/plain"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] || null;
+                      setImportFile(file);
+                    }}
+                    className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+                  />
+                  <p className="text-xs text-gray-500">
+                    Colonnes attendues: Date Time, Customer Name, Customer Email, Customer Phone, Service, Duration (mins.), Booking Id, Custom Fields.
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-gray-700">Mode d'import</label>
+                  <div className="flex gap-2">
+                    <Button
+                      variant={importMode === 'update' ? 'primary' : 'ghost'}
+                      size="sm"
+                      onClick={() => setImportMode('update')}
+                    >
+                      Mettre à jour si existe
+                    </Button>
+                    <Button
+                      variant={importMode === 'skip' ? 'primary' : 'ghost'}
+                      size="sm"
+                      onClick={() => setImportMode('skip')}
+                    >
+                      Ignorer si existe
+                    </Button>
+                  </div>
+                </div>
+
+                {importResult && (
+                  <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700 space-y-2">
+                    <div className="flex flex-wrap gap-4">
+                      <span className="font-semibold">Créés: {importResult.created}</span>
+                      <span className="font-semibold">Mis à jour: {importResult.updated}</span>
+                    </div>
+                    {importResult.skipped.length > 0 && (
+                      <div>
+                        <p className="font-semibold text-orange-600">Ignorés</p>
+                        <ul className="list-disc ml-5 text-xs text-gray-600">
+                          {importResult.skipped.slice(0, 5).map((item) => (
+                            <li key={`skip-${item.line}`}>Ligne {item.line}: {item.reason}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {importResult.errors.length > 0 && (
+                      <div>
+                        <p className="font-semibold text-red-600">Erreurs</p>
+                        <ul className="list-disc ml-5 text-xs text-gray-600">
+                          {importResult.errors.slice(0, 5).map((item) => (
+                            <li key={`err-${item.line}`}>Ligne {item.line}: {item.reason}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setImportFile(null);
+                    setImportResult(null);
+                  }}
+                  fullWidth
+                >
+                  Fermer
+                </Button>
+                <Button
+                  variant="primary"
+                  onClick={handleImportTsv}
+                  fullWidth
+                  disabled={!importFile || importLoading}
+                >
+                  {importLoading ? 'Import en cours...' : 'Lancer l\'import'}
+                </Button>
               </div>
             </Card>
           </div>

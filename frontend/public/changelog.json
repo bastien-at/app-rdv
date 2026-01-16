@@ -1,6 +1,11 @@
 {
-  "generatedAt": "2026-01-16T13:18:00.000Z",
+  "generatedAt": "2026-01-16T15:22:00.000Z",
   "entries": [
+    {
+      "hash": "local",
+      "message": "feat: import TSV des RDV (admin) avec mode update/skip, statut pending par défaut et sans emails",
+      "date": "2026-01-16"
+    },
     {
       "hash": "fbb772c",
       "message": "fix: align admin month view grid with week view (pad weeks and remove Sunday column)",

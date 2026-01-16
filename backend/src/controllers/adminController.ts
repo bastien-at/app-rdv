@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { query } from '../db';
+import multer from 'multer';
+import { query, transaction } from '../db';
 import crypto from 'crypto';
 import {
   Admin,
@@ -8,12 +9,115 @@ import {
   UpdateAdminData,
   Booking,
   BookingWithDetails,
-  BookingStats,
+  Service,
 } from '../types';
-import { hashPassword, verifyPassword, generateToken } from '../utils/auth';
-import { format, startOfMonth, endOfMonth, addMinutes } from 'date-fns';
+import { hashPassword, verifyPassword, generateToken, generateBookingToken } from '../utils/auth';
+import { format, startOfMonth, endOfMonth, addMinutes, parse } from 'date-fns';
 import { isSlotAvailable } from '../utils/availability';
 import { sendConfirmationEmail, sendPasswordResetEmail } from '../utils/email';
+
+const importUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = /tsv|text/;
+    const mimetype = allowed.test(file.mimetype);
+    const extname = allowed.test(file.originalname.toLowerCase());
+    if (mimetype || extname) {
+      cb(null, true);
+    } else {
+      cb(new Error('Seuls les fichiers TSV sont autorisés'));
+    }
+  },
+}).single('file');
+
+type ParsedTsvRow = {
+  dateTime: string;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  serviceName?: string;
+  durationMinutes?: string;
+  bookingId?: string;
+  customFields?: string;
+};
+
+const parseTsvLine = (line: string): string[] => {
+  return line.split('\t').map((value) => value.trim());
+};
+
+const parseTsvDateTime = (value: string): Date | null => {
+  if (!value) return null;
+  const parsed = parse(value, 'dd/MM/yyyy HH:mm', new Date());
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const splitCustomerName = (value: string): { firstname: string; lastname: string } | null => {
+  if (!value) return null;
+  const parts = value.split(' ').filter(Boolean);
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return { firstname: parts[0], lastname: '-' };
+  return { firstname: parts[0], lastname: parts.slice(1).join(' ') };
+};
+
+const normalizeServiceName = (value: string): string => {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (trimmed.includes(' - ')) {
+    return trimmed.split(' - ')[0].trim();
+  }
+  return trimmed;
+};
+
+const normalizeServiceKey = (value: string): string => {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+};
+
+const resolveServiceByName = (
+  serviceName: string,
+  serviceMap: Map<string, Service>,
+  fittingFallback: Service | undefined,
+): Service | undefined => {
+  const normalized = normalizeServiceKey(normalizeServiceName(serviceName));
+  if (!normalized) return undefined;
+
+  if (normalized.includes('etude posturale') && fittingFallback) {
+    return fittingFallback;
+  }
+
+  const candidates = new Set<string>([normalized]);
+  if (normalized.includes('forfait revision')) {
+    candidates.add(normalized.replace('forfait revision', 'forfait atelier'));
+  }
+  if (normalized.includes('main doeuvre')) {
+    candidates.add('main doeuvre 1h');
+  }
+
+  for (const candidate of candidates) {
+    const match = serviceMap.get(candidate);
+    if (match) return match;
+  }
+
+  return undefined;
+};
+
+const parseCustomFields = (value?: string): Record<string, unknown> | null => {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed === 'object') {
+      return parsed as Record<string, unknown>;
+    }
+  } catch (error) {
+    return { raw: value };
+  }
+  return null;
+};
 
 /**
  * Connexion admin
@@ -474,6 +578,238 @@ export const getAllBookings = async (
       error: 'Erreur lors de la récupération des réservations',
     });
   }
+};
+
+/**
+ * Importer des réservations depuis un TSV (admin)
+ */
+export const importBookingsTsv = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  importUpload(req, res, async (err) => {
+    if (err) {
+      res.status(400).json({
+        success: false,
+        error: err.message,
+      });
+      return;
+    }
+
+    try {
+      const storeId = req.body.store_id as string | undefined;
+      const mode = (req.body.mode as string | undefined) || 'update';
+
+      if (!storeId) {
+        res.status(400).json({
+          success: false,
+          error: 'store_id requis',
+        });
+        return;
+      }
+
+      if (!req.file) {
+        res.status(400).json({
+          success: false,
+          error: 'Fichier TSV manquant',
+        });
+        return;
+      }
+
+      const tsvContent = req.file.buffer.toString('utf-8');
+      const lines = tsvContent.split(/\r?\n/).filter((line) => line.trim().length > 0);
+      if (lines.length < 2) {
+        res.status(400).json({
+          success: false,
+          error: 'Fichier TSV vide ou sans données',
+        });
+        return;
+      }
+
+      const header = parseTsvLine(lines[0]);
+      const indexOf = (label: string) => header.findIndex((col) => col === label);
+
+      const idxDateTime = indexOf('Date Time');
+      const idxCustomerName = indexOf('Customer Name');
+      const idxCustomerEmail = indexOf('Customer Email');
+      const idxCustomerPhone = indexOf('Customer Phone');
+      const idxService = indexOf('Service');
+      const idxDuration = indexOf('Duration (mins.)');
+      const idxBookingId = indexOf('Booking Id');
+      const idxCustomFields = indexOf('Custom Fields');
+
+      if (idxDateTime === -1 || idxService === -1) {
+        res.status(400).json({
+          success: false,
+          error: 'Colonnes requises manquantes (Date Time, Service)',
+        });
+        return;
+      }
+
+      const servicesResult = await query<Service>(
+        'SELECT id, name, duration_minutes, service_type FROM services WHERE store_id = $1 AND active = true',
+        [storeId],
+      );
+
+      const serviceMap = new Map<string, Service>();
+      servicesResult.rows.forEach((service) => {
+        serviceMap.set(normalizeServiceKey(service.name), service);
+      });
+
+      const fittingFallback = servicesResult.rows.find((service) =>
+        normalizeServiceKey(service.name).includes('etude posturale'),
+      );
+
+      const created: string[] = [];
+      const updated: string[] = [];
+      const skipped: { line: number; reason: string }[] = [];
+      const errors: { line: number; reason: string }[] = [];
+
+      await transaction(async (client) => {
+        for (let i = 1; i < lines.length; i++) {
+          const lineNumber = i + 1;
+          const columns = parseTsvLine(lines[i]);
+          const row: ParsedTsvRow = {
+            dateTime: columns[idxDateTime] || '',
+            customerName: idxCustomerName !== -1 ? columns[idxCustomerName] : undefined,
+            customerEmail: idxCustomerEmail !== -1 ? columns[idxCustomerEmail] : undefined,
+            customerPhone: idxCustomerPhone !== -1 ? columns[idxCustomerPhone] : undefined,
+            serviceName: idxService !== -1 ? columns[idxService] : undefined,
+            durationMinutes: idxDuration !== -1 ? columns[idxDuration] : undefined,
+            bookingId: idxBookingId !== -1 ? columns[idxBookingId] : undefined,
+            customFields: idxCustomFields !== -1 ? columns[idxCustomFields] : undefined,
+          };
+
+          const start = parseTsvDateTime(row.dateTime);
+          if (!start) {
+            skipped.push({ line: lineNumber, reason: 'Date Time invalide ou manquant' });
+            continue;
+          }
+
+          const service = resolveServiceByName(
+            row.serviceName || '',
+            serviceMap,
+            fittingFallback,
+          );
+          if (!service) {
+            skipped.push({ line: lineNumber, reason: `Service introuvable: ${row.serviceName || 'N/A'}` });
+            continue;
+          }
+
+          const name = splitCustomerName(row.customerName || '');
+          if (!name || !row.customerEmail || !row.customerPhone) {
+            skipped.push({ line: lineNumber, reason: 'Client incomplet (nom/email/téléphone requis)' });
+            continue;
+          }
+
+          const duration = row.durationMinutes ? parseInt(row.durationMinutes, 10) : service.duration_minutes;
+          if (!duration || Number.isNaN(duration)) {
+            skipped.push({ line: lineNumber, reason: 'Durée invalide' });
+            continue;
+          }
+
+          const end = addMinutes(start, duration);
+          const bookingToken = row.bookingId
+            ? row.bookingId.length <= 64
+              ? row.bookingId
+              : crypto.createHash('sha256').update(row.bookingId).digest('hex')
+            : generateBookingToken();
+          const customFields = parseCustomFields(row.customFields || undefined);
+          const customerData = customFields ? { custom_fields: customFields } : {};
+
+          try {
+            const savepoint = `import_row_${lineNumber}`;
+            await client.query(`SAVEPOINT ${savepoint}`);
+            const existingResult = await client.query<Booking>(
+              'SELECT id FROM bookings WHERE booking_token = $1',
+              [bookingToken],
+            );
+
+            if (existingResult.rows.length > 0) {
+              if (mode === 'skip') {
+                skipped.push({ line: lineNumber, reason: 'Déjà existant (skip)' });
+                continue;
+              }
+
+              await client.query(
+                `UPDATE bookings
+                 SET store_id = $1,
+                     service_id = $2,
+                     start_datetime = $3,
+                     end_datetime = $4,
+                     customer_firstname = $5,
+                     customer_lastname = $6,
+                     customer_email = $7,
+                     customer_phone = $8,
+                     customer_data = $9,
+                     status = 'pending'
+                 WHERE booking_token = $10`,
+                [
+                  storeId,
+                  service.id,
+                  start,
+                  end,
+                  name.firstname,
+                  name.lastname,
+                  row.customerEmail,
+                  row.customerPhone,
+                  JSON.stringify(customerData),
+                  bookingToken,
+                ],
+              );
+              updated.push(bookingToken);
+            } else {
+              await client.query(
+                `INSERT INTO bookings (
+                  booking_token, store_id, service_id,
+                  start_datetime, end_datetime, status,
+                  customer_firstname, customer_lastname, customer_email, customer_phone,
+                  customer_data
+                ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10)`,
+                [
+                  bookingToken,
+                  storeId,
+                  service.id,
+                  start,
+                  end,
+                  name.firstname,
+                  name.lastname,
+                  row.customerEmail,
+                  row.customerPhone,
+                  JSON.stringify(customerData),
+                ],
+              );
+              created.push(bookingToken);
+            }
+          } catch (rowError: any) {
+            const savepoint = `import_row_${lineNumber}`;
+            try {
+              await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+            } catch (rollbackError) {
+              console.error('Erreur rollback savepoint:', rollbackError);
+            }
+            errors.push({ line: lineNumber, reason: rowError?.message || 'Erreur insertion' });
+          }
+        }
+      });
+
+      res.json({
+        success: true,
+        data: {
+          created: created.length,
+          updated: updated.length,
+          skipped,
+          errors,
+        },
+      });
+    } catch (error: any) {
+      console.error('Erreur import TSV:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Erreur lors de l\'import TSV',
+      });
+    }
+  });
 };
 
 /**
