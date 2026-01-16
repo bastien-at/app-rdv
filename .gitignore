@@ -43,3 +43,6 @@ lerna-debug.log*
 .cache
 .yarn
 .npm
+
+# Uploads
+backend/uploads/
