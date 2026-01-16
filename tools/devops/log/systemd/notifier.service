@@ -1,0 +1,14 @@
+[Unit]
+Description=Service for Grafana OnCall to notify alerts
+Requires=docker.service
+After=docker.service
+
+[Service]
+Restart=always
+RestartSec=10s
+Type=simple
+WorkingDirectory=/usr/local/bin/log/scripts/notifier/
+ExecStart=/usr/bin/env python3 -u notifier.py
+
+[Install]
+WantedBy=multi-user.target

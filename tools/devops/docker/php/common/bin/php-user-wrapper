@@ -1,0 +1,5 @@
+#!/bin/bash
+
+set -- php "$@"
+cmd="$(printf "%q " "$@")"
+su -w "$(env | grep -Eo '^[^=]+' | grep -Ev '^(HOME|SHELL|USER|LOGNAME|PATH|IFS)$' | tr '\n' ',')" - www-data -c "$cmd"

@@ -25,7 +25,7 @@ router.get('/health', (req, res) => {
 router.use('/', inspectionRoutes);
 
 // Routes annuaire des clients (admin - contient un middleware auth global !)
-router.use('/', customerDirectoryRoutes);
+router.use('/admin', customerDirectoryRoutes);
 
 // Routes admin protégées
 router.use('/admin', adminRouter);

@@ -8,10 +8,12 @@ import {
   getStoreBookings,
   updateBookingStatus,
   adminUpdateAndConfirmBooking,
+  completeBooking,
   getStoreAvailabilityBlocks,
   createAvailabilityBlock,
   deleteAvailabilityBlock,
   getStoreStats,
+  importBookingsTsv,
   getAllAdmins,
   createAdmin,
   updateAdmin,
@@ -19,11 +21,16 @@ import {
   saveReceptionReport,
 } from '../controllers/adminController';
 import {
+  getStoreById,
   createStore,
   updateStore,
   deleteStore,
 } from '../controllers/storeController';
-import { authenticate, requireStoreAccess, requireSuperAdmin } from '../middleware/auth';
+import {
+  authenticate,
+  requireStoreAccess,
+  requireSuperAdmin,
+} from '../middleware/auth';
 import {
   validateAdminLogin,
   validateUpdateStatus,
@@ -53,16 +60,35 @@ router.get('/stores/:storeId/bookings', requireStoreAccess, getStoreBookings);
 router.put('/bookings/:id/status', validateUpdateStatus, updateBookingStatus);
 
 // PUT /api/admin/bookings/:id/confirm - Mettre à jour et confirmer une réservation
-router.put('/bookings/:id/confirm', validateAdminUpdateAndConfirmBooking, adminUpdateAndConfirmBooking);
+router.put(
+  '/bookings/:id/confirm',
+  validateAdminUpdateAndConfirmBooking,
+  adminUpdateAndConfirmBooking,
+);
+
+// POST /api/admin/bookings/import-tsv - Importer un TSV de réservations
+router.post('/bookings/import-tsv', importBookingsTsv);
+
+// POST /api/admin/bookings/:id/complete - Terminer une réservation et envoyer un mail
+router.post('/bookings/:id/complete', completeBooking);
 
 // POST /api/admin/bookings/:id/reception-report - Enregistrer un état des lieux
 router.post('/bookings/:id/reception-report', saveReceptionReport);
 
 // GET /api/admin/stores/:storeId/availability-blocks - Blocages d'un magasin
-router.get('/stores/:storeId/availability-blocks', requireStoreAccess, getStoreAvailabilityBlocks);
+router.get(
+  '/stores/:storeId/availability-blocks',
+  requireStoreAccess,
+  getStoreAvailabilityBlocks,
+);
 
 // POST /api/admin/availability-blocks - Créer un blocage
-router.post('/availability-blocks', validateCreateBlock, createAvailabilityBlock);
+router.post(
+  '/availability-blocks',
+  requireStoreAccess,
+  validateCreateBlock,
+  createAvailabilityBlock,
+);
 
 // DELETE /api/admin/availability-blocks/:id - Supprimer un blocage
 router.delete('/availability-blocks/:id', deleteAvailabilityBlock);
@@ -70,6 +96,9 @@ router.delete('/availability-blocks/:id', deleteAvailabilityBlock);
 // Routes super admin uniquement
 // GET /api/admin/admins - Liste tous les administrateurs
 router.get('/admins', requireSuperAdmin, getAllAdmins);
+
+// GET /api/admin/stores/:id - Récupérer les détails d'un magasin
+router.get('/stores/:id', requireStoreAccess, getStoreById);
 
 // POST /api/admin/admins - Créer un administrateur
 router.post('/admins', requireSuperAdmin, createAdmin);

@@ -41,7 +41,7 @@ export const validateCreateBooking = [
   body('customer_email')
     .trim()
     .isEmail().withMessage('Email invalide')
-    .normalizeEmail(),
+    .normalizeEmail({ gmail_remove_dots: false }),
   body('customer_phone')
     .trim()
     .matches(/^(\+33|0)[1-9](\d{2}){4}$/).withMessage('Numéro de téléphone français invalide'),
@@ -60,7 +60,7 @@ export const validateUpdateBooking = [
   body('start_datetime').optional().isISO8601().withMessage('Date/heure invalide'),
   body('customer_firstname').optional().trim().isLength({ max: 100 }),
   body('customer_lastname').optional().trim().isLength({ max: 100 }),
-  body('customer_email').optional().trim().isEmail().normalizeEmail(),
+  body('customer_email').optional().trim().isEmail().normalizeEmail({ gmail_remove_dots: false }),
   body('customer_phone').optional().trim().matches(/^(\+33|0)[1-9](\d{2}){4}$/),
   body('customer_data').optional().isObject(),
   validate,
@@ -80,7 +80,7 @@ export const validateAvailability = [
  * Validations pour la connexion admin
  */
 export const validateAdminLogin = [
-  body('email').trim().isEmail().withMessage('Email invalide').normalizeEmail(),
+  body('email').trim().isEmail().withMessage('Email invalide').normalizeEmail({ gmail_remove_dots: false }),
   body('password').notEmpty().withMessage('Mot de passe requis'),
   validate,
 ];
@@ -106,6 +106,7 @@ export const validateUpdateStatus = [
     .isIn(['pending', 'confirmed', 'completed', 'cancelled', 'no_show'])
     .withMessage('Statut invalide'),
   body('internal_notes').optional().trim(),
+  body('public_notes').optional().trim(),
   validate,
 ];
 
@@ -118,5 +119,6 @@ export const validateAdminUpdateAndConfirmBooking = [
   body('start_datetime').optional().isISO8601().withMessage('Date/heure invalide'),
   body('technician_id').optional().isUUID().withMessage('ID technicien invalide'),
   body('internal_notes').optional().trim(),
+  body('public_notes').optional().trim(),
   validate,
 ];

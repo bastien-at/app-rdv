@@ -7,15 +7,15 @@ import {
   updateCustomer,
   deleteCustomer
 } from '../controllers/customerDirectoryController';
-import { authenticateAdmin } from '../middleware/auth';
+import { authenticateAdmin, requireStoreAccess } from '../middleware/auth';
 
 const router = Router();
 
 // Routes nécessitant une authentification admin
-router.get('/stores/:store_id/customers', authenticateAdmin, getCustomers);
-router.get('/stores/:store_id/customers/search', authenticateAdmin, searchCustomers);
+router.get('/stores/:store_id/customers', authenticateAdmin, requireStoreAccess, getCustomers);
+router.get('/stores/:store_id/customers/search', authenticateAdmin, requireStoreAccess, searchCustomers);
 
-router.post('/stores/:store_id/customers', authenticateAdmin, [
+router.post('/stores/:store_id/customers', authenticateAdmin, requireStoreAccess, [
   body('firstname')
     .trim()
     .isLength({ min: 1, max: 100 })

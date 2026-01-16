@@ -1,0 +1,26 @@
+{{- if .Values.loadBalancer.enabled -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ template "fullname" . }}-lb
+  labels:
+    app: {{ template "name" . }}
+    {{- include "labels" . | nindent 4 }}
+  annotations:
+    cloud.google.com/load-balancer-type: Internal
+spec:
+  externalTrafficPolicy: Cluster
+  ports:
+    {{- range $name, $value := .Values.service.ports }}
+    - name: {{ $name }}
+      port: {{ $value }}
+      targetPort: {{ $name }}
+    {{- end }}
+  selector:
+    app: {{ template "name" . }}
+    {{- if .Values.blueGreen.enabled }}
+    blue-green: {{ include "blueGreenToTrafficApp" . }}
+    {{ end }}
+  sessionAffinity: None
+  type: LoadBalancer
+{{- end }}

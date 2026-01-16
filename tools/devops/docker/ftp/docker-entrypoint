@@ -1,0 +1,45 @@
+#!/bin/bash
+
+function _user() {
+  IFS=':' read -a param <<<$1
+
+  user="${param[0]}"
+  pass="${param[1]}"
+
+  if [ "${param[2]}" == "e" ]; then
+    chpasswdOptions="-e"
+  fi
+
+  adduser --gecos "" --home /home/$user --disabled-password --uid $nextuid --gid $FTP_USERS_COMMON_GROUP_ID $user
+  mkdir -p /home/$user
+  chown $user:$FTP_USERS_COMMON_GROUP_ID /home/$user
+  if [ ! -d /home/$user/ftp ]; then
+    mkdir -p /home/$user/ftp
+    chown $user:$FTP_USERS_COMMON_GROUP_ID /home/$user/ftp
+    chmod 770 /home/$user/ftp
+  elif stat -c '%A' /home/$user/ftp | grep -vP '^.....w' > /dev/null; then
+    chmod g+rw /home/$user/sftp
+  fi
+
+  echo "$user:$pass" | chpasswd $chpasswdOptions
+
+  nextuid=$((nextuid + 1))
+}
+
+nextuid=4001
+FTP_USERS_COMMON_GROUP_ID=${FTP_USERS_COMMON_GROUP_ID:-4000}
+
+if ! getent group $FTP_USERS_COMMON_GROUP_ID; then
+  addgroup --gid $FTP_USERS_COMMON_GROUP_ID ftp_common_group
+fi
+
+cat /etc/vsftpd/users/accounts | while read user; do
+  echo "Create user $user"
+  _user $user
+done
+
+if [ "1" -eq $FTP_SSL ]; then
+   sed -i "s#ssl_enable=NO#ssl_enable=YES#" /etc/vsftpd/vsftpd.conf
+fi
+
+vsftpd /etc/vsftpd/vsftpd.conf

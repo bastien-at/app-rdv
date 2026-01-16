@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Calendar, Clock, User, Mail, Phone, MapPin, Bike, Wrench } from 'lucide-react';
+import { X, Calendar, Clock, User, Mail, Phone, MapPin, Bike, Wrench, Search } from 'lucide-react';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Button from './Button';
@@ -24,6 +24,7 @@ export default function CreateBookingModal({ isOpen, onClose, onSuccess }: Creat
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>('');
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
+  const [serviceSearchQuery, setServiceSearchQuery] = useState('');
   
   const [customerData, setCustomerData] = useState({
     firstname: '',
@@ -138,6 +139,7 @@ export default function CreateBookingModal({ isOpen, onClose, onSuccess }: Creat
     setSelectedService(null);
     setSelectedDate('');
     setSelectedSlot(null);
+    setServiceSearchQuery('');
     setCustomerData({
       firstname: '',
       lastname: '',
@@ -199,6 +201,14 @@ export default function CreateBookingModal({ isOpen, onClose, onSuccess }: Creat
 
   const isFitting = selectedService?.name?.toLowerCase().includes('posturale') || 
                     selectedService?.name?.toLowerCase().includes('fitting');
+
+  const filteredServices = services.filter((service) => {
+    const query = serviceSearchQuery.trim().toLowerCase();
+    if (!query) return true;
+    const name = service.name?.toLowerCase() || '';
+    const description = service.description?.toLowerCase() || '';
+    return name.includes(query) || description.includes(query);
+  });
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -280,8 +290,23 @@ export default function CreateBookingModal({ isOpen, onClose, onSuccess }: Creat
           {step === 'service' && (
             <div>
               <h3 className="text-lg font-semibold mb-4">Choisissez un service</h3>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Rechercher une prestation
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <input
+                    type="text"
+                    value={serviceSearchQuery}
+                    onChange={(e) => setServiceSearchQuery(e.target.value)}
+                    placeholder="Nom ou description..."
+                    className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+              </div>
               <div className="space-y-3">
-                {services.map((service) => {
+                {filteredServices.map((service) => {
                   const isFittingService = service.name?.toLowerCase().includes('posturale') || 
                                           service.name?.toLowerCase().includes('fitting');
                   return (
@@ -317,6 +342,11 @@ export default function CreateBookingModal({ isOpen, onClose, onSuccess }: Creat
                     </button>
                   );
                 })}
+                {filteredServices.length === 0 && (
+                  <div className="text-center text-sm text-gray-500 py-6">
+                    Aucune prestation ne correspond à votre recherche.
+                  </div>
+                )}
               </div>
             </div>
           )}

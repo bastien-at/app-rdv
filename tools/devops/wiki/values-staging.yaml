@@ -1,0 +1,20 @@
+requarks:
+  ingress:
+    hosts:
+      - host: documentation.pr.k8s.alltricks.buzz
+        paths:
+          - path: "/"
+            pathType: Prefix
+    tls:
+      - secretName: tls-documentation-k8s
+        hosts:
+        - documentation.pr.k8s.alltricks.buzz
+kroki:
+  ingress:
+    hosts:
+      - host: documentation-kroki.pr.k8s.alltricks.buzz
+        paths: ["/"]
+    tls:
+      - secretName: tls-kroki-k8s
+        hosts:
+          - documentation-kroki.pr.k8s.alltricks.buzz

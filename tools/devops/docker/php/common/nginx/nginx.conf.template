@@ -1,0 +1,114 @@
+user www-data;
+worker_processes ${NGINX_WORKER_PROCESSES:-auto};
+pid /run/nginx.pid;
+include /etc/nginx/modules-enabled/*.conf;
+daemon off;
+
+events {
+    worker_connections ${NGINX_WORKER_CONNECTIONS:-1024};
+    multi_accept ${NGINX_MULTI_ACCEPT:-off};
+    use epoll;
+}
+
+http {
+    include /etc/nginx/conf.d/*.conf;
+
+    map $$http_x_request_id $$req_id {
+        default $$http_x_request_id;
+        "" $$request_id;
+    }
+    map $$http_x_forwarded_for $$first_client_ip {
+        "~^([0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3})" $$1;
+        default $$remote_addr;
+    }
+    map ${TRUSTED_CF_SIGNATURE}-${TRUSTED_XFF_SIGNATURE}-$$http_x_trusted_cf_signature-$$http_x_trusted_xff_signature $$client_ip {
+        default $$remote_addr;
+        "---" $$first_client_ip;
+        "${TRUSTED_CF_SIGNATURE:-96114022bf}-${TRUSTED_XFF_SIGNATURE:-96114022bf}-${TRUSTED_CF_SIGNATURE:-96114022bf}-${TRUSTED_XFF_SIGNATURE:-96114022bf}" $$http_cf_connecting_ip;
+        "${TRUSTED_CF_SIGNATURE:-96114022bf}-${TRUSTED_XFF_SIGNATURE:-96114022bf}-${TRUSTED_CF_SIGNATURE:-96114022bf}-" $$http_cf_connecting_ip;
+        "${TRUSTED_CF_SIGNATURE:-96114022bf}-${TRUSTED_XFF_SIGNATURE:-96114022bf}--${TRUSTED_XFF_SIGNATURE:-96114022bf}" $$http_x_forwarded_for;
+        "-${TRUSTED_XFF_SIGNATURE:-96114022bf}--${TRUSTED_XFF_SIGNATURE:-96114022bf}" $$first_client_ip;
+    }
+    more_set_input_headers 'x-request-id: $$req_id';
+    more_set_input_headers 'x-forwarded-for: $$client_ip';
+
+    map $$host $$host_country {
+        default donotexist;
+        www.alltricks.fr fr;
+        www.alltricks.com com;
+        www.alltricks.it it;
+        www.alltricks.es es;
+        www.alltricks.de de;
+        www.alltricks.nl nl;
+        www.alltricks.pt pt;
+        ~fr-.+.pr.k8s.alltricks.buzz fr;
+        ~com-.+.pr.k8s.alltricks.buzz com;
+        ~it-.+.pr.k8s.alltricks.buzz it;
+        ~es-.+.pr.k8s.alltricks.buzz es;
+        ~de-.+.pr.k8s.alltricks.buzz de;
+        ~nl-.+.pr.k8s.alltricks.buzz nl;
+        ~pt-.+.pr.k8s.alltricks.buzz pt;
+        alltricks.fr.buzz fr;
+        alltricks.com.buzz com;
+        alltricks.it.buzz it;
+        alltricks.es.buzz es;
+        alltricks.de.buzz de;
+        alltricks.nl.buzz nl;
+        alltricks.pt.buzz pt;
+    }
+
+    map $$host_country $$s4a_token {
+        default donotexist;
+        fr "feb1fee1eb5e69fe4374b3e4bd671d02";
+        com "927cafba7a2d50c2a913aed2c2a11587";
+        it "5e3dd501897745d6e0c053a7497cfc65";
+        es "54bfe0766098a9d0d9ccc18617f97e80";
+        de "d19cf365d90539e06ef3d371c4ee81de";
+        nl "f1437718370019ec3e1e16ccf40a5f8f";
+    }
+
+    log_format json_combined escape=json
+      '{'
+        '"log_source":"access",'
+        '"server_name":"$$server_name",'
+        '"time":"$$msec",'
+        '"client_ip":"$$client_ip",'
+        '"remote_addr":"$$remote_addr",'
+        '"remote_user":"$$remote_user",'
+        '"method":"$$request_method",'
+        '"host":"$$host",'
+        '"message":"$$request_method $$request_uri",'
+        '"server_protocol":"$$server_protocol",'
+        '"status": "$$status",'
+        '"body_bytes_sent":"$$body_bytes_sent",'
+        '"request_time":"$$request_time",'
+        '"http_referrer":"$$http_referer",'
+        '"http_user_agent":"$$http_user_agent",'
+        '"extra":{"uid":"$$req_id","cf_ray_id":"$$http_cf_ray"}'
+      '}';
+
+    access_log ${NGINX_ACCESS_LOG:-/var/log/nginx/access.log} json_combined;
+    error_log ${NGINX_ERROR_LOG:-/var/log/nginx/error.log};
+    server_tokens off;
+    sendfile on;
+    tcp_nopush on;
+    tcp_nodelay on;
+    keepalive_timeout ${NGINX_KEEPALIVE_TIMEOUT:-5};
+    types_hash_max_size 2048;
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    gzip on;
+    gzip_min_length ${NGINX_GZIP_MIN_LENGTH:-1000};
+    gzip_proxied expired no-cache no-store private auth;
+    gzip_types ${NGINX_GZIP_TYPES:-application/atom+xml application/geo+json application/javascript application/json application/ld+json application/manifest+json application/rdf+xml application/rss+xml application/vnd.ms-fontobject application/wasm application/x-font-ttf application/x-javascript application/x-web-app-manifest+json application/xhtml+xml application/xml font/eot font/opentype font/otf font/ttf image/bmp image/svg+xml image/vnd.microsoft.icon image/x-icon text/cache-manifest text/calendar text/css text/javascript text/markdown text/plain text/vcard text/vnd.rim.location.xloc text/vtt text/x-component text/x-cross-domain-policy text/xml};
+    gzip_disable "MSIE [1-6]\.(?!.*SV1)";
+    include /etc/nginx/sites-enabled/*;
+    send_timeout ${NGINX_SEND_TIMEOUT:-60};
+    proxy_connect_timeout ${NGINX_PROXY_CONNECT_TIMEOUT:-60};
+    proxy_send_timeout ${NGINX_PROXY_SEND_TIMEOUT:-60};
+    proxy_read_timeout ${NGINX_PROXY_READ_TIMEOUT:-60};
+    fastcgi_read_timeout ${NGINX_FASTCGI_READ_TIMEOUT:-60};
+    fastcgi_send_timeout ${NGINX_FASTCGI_SEND_TIMEOUT:-60};
+    client_max_body_size ${NGINX_CLIENT_MAX_BODY_SIZE:-50M};
+    reset_timedout_connection on;
+}

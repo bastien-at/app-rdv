@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import ModernHomePage from './pages/ModernHomePage';
 import ModernStoresPage from './pages/ModernStoresPage';
 import StoreLandingPage from './pages/StoreLandingPage';
@@ -46,6 +46,8 @@ function App() {
             <Route path="/admin/availability" element={<AvailabilityManagementPage />} />
             <Route path="/admin/planning" element={<PlanningPage />} />
             <Route path="/admin/store-settings" element={<StoreSettingsPage />} />
+            {/* Catch-all pour l'espace admin redirigeant vers planning */}
+            <Route path="/admin/*" element={<Navigate to="/admin/planning" replace />} />
           </Route>
         </Routes>
       </ErrorBoundary>

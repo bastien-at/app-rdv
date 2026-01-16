@@ -30,7 +30,8 @@ export default function StoreSettingsPage() {
     },
     has_workshop: true,
     has_fitting: true,
-    workshop_capacity: 1
+    workshop_capacity: 1,
+    fitting_capacity: 1
   });
 
   const [currentPassword, setCurrentPassword] = useState('');
@@ -68,8 +69,9 @@ export default function StoreSettingsPage() {
         has_workshop: data.has_workshop ?? true,
         has_fitting: data.has_fitting ?? true,
         workshop_capacity: data.workshop_capacity ?? 1,
+        fitting_capacity: data.fitting_capacity ?? 1,
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erreur chargement magasin:', error);
     } finally {
       setLoading(false);
@@ -229,7 +231,7 @@ export default function StoreSettingsPage() {
                   {formData.has_workshop && (
                     <div className="mt-2" onClick={(e) => e.preventDefault()}>
                       <label className="text-xs font-medium text-gray-700 mb-1 block">
-                        Nombre de techniciens / créneaux simultanés
+                        Nombre de techniciens simultanés (Atelier)
                       </label>
                       <input 
                         type="number"
@@ -259,7 +261,23 @@ export default function StoreSettingsPage() {
                     <Bike className={`h-4 w-4 ${formData.has_fitting ? 'text-[#005162]' : 'text-gray-400'}`} />
                     <span className={`font-bold ${formData.has_fitting ? 'text-[#005162]' : 'text-gray-700'}`}>Étude posturale</span>
                   </div>
-                  <p className="text-xs text-gray-500">Analyse posturale et réglages</p>
+                  <p className="text-xs text-gray-500 mb-3">Analyse posturale et réglages</p>
+                  
+                  {formData.has_fitting && (
+                    <div className="mt-2" onClick={(e) => e.preventDefault()}>
+                      <label className="text-xs font-medium text-gray-700 mb-1 block">
+                        Nombre de techniciens simultanés (Étude)
+                      </label>
+                      <input 
+                        type="number"
+                        min="1"
+                        max="10"
+                        value={formData.fitting_capacity || 1}
+                        onChange={(e) => handleChange('fitting_capacity', parseInt(e.target.value) || 1)}
+                        className="w-20 px-2 py-1 text-sm border border-gray-300 rounded focus:ring-[#005162] focus:border-[#005162]"
+                      />
+                    </div>
+                  )}
                 </div>
               </label>
             </div>

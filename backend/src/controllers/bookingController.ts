@@ -84,9 +84,11 @@ export const createBooking = async (
       customer_email,
       customer_phone,
       customer_data,
+      source,
+      status,
     } = req.body;
     
-    console.log('📝 [createBooking] Reçu pour:', customer_email);
+    console.log('📝 [createBooking] Reçu pour:', customer_email, 'Source:', source);
 
     const startDate = new Date(start_datetime);
     
@@ -108,12 +110,13 @@ export const createBooking = async (
     const endDate = addMinutes(startDate, service.duration_minutes);
     
     // Vérifier la disponibilité du créneau
-    const available = await isSlotAvailable(store_id, service_id, startDate);
+    // Si source === 'admin', on autorise l'override de capacité
+    const available = await isSlotAvailable(store_id, service_id, startDate, source === 'admin');
     
     if (!available) {
       res.status(409).json({
         success: false,
-        error: 'Ce créneau n\'est plus disponible',
+        error: 'Ce créneau est complet (capacité maximale atteinte)',
       });
       return;
     }
@@ -139,7 +142,7 @@ export const createBooking = async (
           technician_id || null,
           startDate,
           endDate,
-          'pending',
+          status || 'pending',
           customer_firstname,
           customer_lastname,
           customer_email,
@@ -274,7 +277,8 @@ export const updateBooking = async (
       const available = await isSlotAvailable(
         existingBooking.store_id,
         existingBooking.service_id,
-        newStartDate
+        newStartDate,
+        true // On autorise l'admin à forcer le créneau même s'il est plein
       );
       
       if (!available) {
@@ -430,8 +434,12 @@ async function getBookingDetails(bookingId: string): Promise<BookingWithDetails>
     `SELECT 
       b.*,
       s.name as store_name,
+      s.address as store_address,
+      s.postal_code as store_postal_code,
+      s.city as store_city,
       srv.name as service_name,
       srv.price as service_price,
+      srv.duration_minutes as service_duration,
       t.name as technician_name
     FROM bookings b
     JOIN stores s ON b.store_id = s.id

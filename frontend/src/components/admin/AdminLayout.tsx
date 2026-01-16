@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { 
   Calendar as CalendarIcon, 
@@ -15,9 +15,19 @@ interface AdminLayoutProps {
   children: ReactNode;
 }
 
+ interface AppInfo {
+   version: string;
+   changelog?: Array<{
+     version: string;
+     date?: string;
+     changes?: string[];
+   }>;
+ }
+
 export default function AdminLayout({ children }: AdminLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
   const adminEmail =
     typeof window !== 'undefined'
       ? localStorage.getItem('admin_email') || sessionStorage.getItem('admin_email')
@@ -26,6 +36,28 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     typeof window !== 'undefined'
       ? localStorage.getItem('admin_role') || sessionStorage.getItem('admin_role')
       : null;
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadAppInfo = async () => {
+      try {
+        const res = await fetch('/app-info.json', { cache: 'no-cache' });
+        if (!res.ok) return;
+        const data = (await res.json()) as AppInfo;
+        if (!isMounted) return;
+        if (data && typeof data.version === 'string') setAppInfo(data);
+      } catch {
+        // Ignore
+      }
+    };
+
+    loadAppInfo();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleLogout = () => {
     // Nettoyer les infos admin des deux stockages
@@ -38,6 +70,10 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
     sessionStorage.removeItem('admin_email');
     sessionStorage.removeItem('admin_role');
     sessionStorage.removeItem('admin_store_id');
+
+    // Supprimer les cookies de connexion si présents
+    document.cookie = 'admin_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+    document.cookie = 'token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
 
     navigate('/admin/login');
   };
@@ -150,6 +186,9 @@ export default function AdminLayout({ children }: AdminLayoutProps) {
               <span className="truncate text-sm font-semibold text-[#142129]">
                 {adminEmail || 'Admin Alltricks'}
               </span>
+              {appInfo?.version ? (
+                <span className="text-xs text-gray-400 mt-0.5">Version {appInfo.version}</span>
+              ) : null}
             </div>
             <button
               onClick={() => navigate('/admin/settings')}

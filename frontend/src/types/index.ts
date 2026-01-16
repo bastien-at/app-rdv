@@ -13,6 +13,7 @@ export interface Store {
   has_workshop?: boolean;
   has_fitting?: boolean;
   workshop_capacity?: number;
+  fitting_capacity?: number;
 }
 
 export interface OpeningHours {
@@ -74,6 +75,7 @@ export interface CreateServiceData {
 }
 
 export interface UpdateServiceData {
+  service_type?: 'fitting' | 'workshop';
   name?: string;
   description?: string;
   duration_minutes?: number;
@@ -102,6 +104,8 @@ export interface CreateBookingData {
   customer_email: string;
   customer_phone: string;
   customer_data: CustomerData;
+  source?: string;
+  status?: 'pending' | 'confirmed' | 'completed' | 'cancelled' | 'no_show';
 }
 
 export interface CustomerData {
@@ -112,6 +116,7 @@ export interface CustomerData {
   pain_description?: string;
   bike_info?: string;
   objectives?: string;
+  notes?: string;
   reception_report?: {
     workPerformed?: string;
     inspectionId?: string;
@@ -142,6 +147,8 @@ export interface Booking {
   service_price?: number;
   service_duration?: number;
   technician_name?: string;
+  internal_notes?: string;
+  public_notes?: string;
   created_at: string;
   updated_at: string;
 }
@@ -190,6 +197,8 @@ export interface CreateStoreData {
   active?: boolean;
   has_workshop?: boolean;
   has_fitting?: boolean;
+  workshop_capacity?: number;
+  fitting_capacity?: number;
 }
 
 export interface ApiResponse<T = any> {

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
-import { query } from '../db';
+import multer from 'multer';
+import { query, transaction } from '../db';
 import crypto from 'crypto';
 import {
   Admin,
@@ -8,12 +9,115 @@ import {
   UpdateAdminData,
   Booking,
   BookingWithDetails,
-  BookingStats,
+  Service,
 } from '../types';
-import { hashPassword, verifyPassword, generateToken } from '../utils/auth';
-import { format, startOfMonth, endOfMonth, addMinutes } from 'date-fns';
+import { hashPassword, verifyPassword, generateToken, generateBookingToken } from '../utils/auth';
+import { format, startOfMonth, endOfMonth, addMinutes, parse } from 'date-fns';
 import { isSlotAvailable } from '../utils/availability';
 import { sendConfirmationEmail, sendPasswordResetEmail } from '../utils/email';
+
+const importUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    const allowed = /tsv|text/;
+    const mimetype = allowed.test(file.mimetype);
+    const extname = allowed.test(file.originalname.toLowerCase());
+    if (mimetype || extname) {
+      cb(null, true);
+    } else {
+      cb(new Error('Seuls les fichiers TSV sont autorisés'));
+    }
+  },
+}).single('file');
+
+type ParsedTsvRow = {
+  dateTime: string;
+  customerName?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  serviceName?: string;
+  durationMinutes?: string;
+  bookingId?: string;
+  customFields?: string;
+};
+
+const parseTsvLine = (line: string): string[] => {
+  return line.split('\t').map((value) => value.trim());
+};
+
+const parseTsvDateTime = (value: string): Date | null => {
+  if (!value) return null;
+  const parsed = parse(value, 'dd/MM/yyyy HH:mm', new Date());
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+};
+
+const splitCustomerName = (value: string): { firstname: string; lastname: string } | null => {
+  if (!value) return null;
+  const parts = value.split(' ').filter(Boolean);
+  if (parts.length === 0) return null;
+  if (parts.length === 1) return { firstname: parts[0], lastname: '-' };
+  return { firstname: parts[0], lastname: parts.slice(1).join(' ') };
+};
+
+const normalizeServiceName = (value: string): string => {
+  if (!value) return '';
+  const trimmed = value.trim();
+  if (trimmed.includes(' - ')) {
+    return trimmed.split(' - ')[0].trim();
+  }
+  return trimmed;
+};
+
+const normalizeServiceKey = (value: string): string => {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+};
+
+const resolveServiceByName = (
+  serviceName: string,
+  serviceMap: Map<string, Service>,
+  fittingFallback: Service | undefined,
+): Service | undefined => {
+  const normalized = normalizeServiceKey(normalizeServiceName(serviceName));
+  if (!normalized) return undefined;
+
+  if (normalized.includes('etude posturale') && fittingFallback) {
+    return fittingFallback;
+  }
+
+  const candidates = new Set<string>([normalized]);
+  if (normalized.includes('forfait revision')) {
+    candidates.add(normalized.replace('forfait revision', 'forfait atelier'));
+  }
+  if (normalized.includes('main doeuvre')) {
+    candidates.add('main doeuvre 1h');
+  }
+
+  for (const candidate of candidates) {
+    const match = serviceMap.get(candidate);
+    if (match) return match;
+  }
+
+  return undefined;
+};
+
+const parseCustomFields = (value?: string): Record<string, unknown> | null => {
+  if (!value) return null;
+  try {
+    const parsed = JSON.parse(value);
+    if (parsed && typeof parsed === 'object') {
+      return parsed as Record<string, unknown>;
+    }
+  } catch (error) {
+    return { raw: value };
+  }
+  return null;
+};
 
 /**
  * Connexion admin
@@ -297,7 +401,7 @@ export const adminUpdateAndConfirmBooking = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { service_id, start_datetime, technician_id, internal_notes, duration } = req.body;
+    const { service_id, start_datetime, technician_id, internal_notes, public_notes, duration } = req.body;
 
     const existingResult = await query<Booking>(
       'SELECT * FROM bookings WHERE id = $1',
@@ -346,8 +450,9 @@ export const adminUpdateAndConfirmBooking = async (
            end_datetime = $3,
            technician_id = COALESCE($4, technician_id),
            status = 'confirmed',
-           internal_notes = COALESCE($5, internal_notes)
-       WHERE id = $6
+           internal_notes = $5,
+           public_notes = $6
+       WHERE id = $7
        RETURNING *`,
       [
         newServiceId,
@@ -355,6 +460,7 @@ export const adminUpdateAndConfirmBooking = async (
         newEnd,
         technician_id || null,
         internal_notes || null,
+        public_notes || null,
         id,
       ],
     );
@@ -475,6 +581,238 @@ export const getAllBookings = async (
 };
 
 /**
+ * Importer des réservations depuis un TSV (admin)
+ */
+export const importBookingsTsv = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  importUpload(req, res, async (err) => {
+    if (err) {
+      res.status(400).json({
+        success: false,
+        error: err.message,
+      });
+      return;
+    }
+
+    try {
+      const storeId = req.body.store_id as string | undefined;
+      const mode = (req.body.mode as string | undefined) || 'update';
+
+      if (!storeId) {
+        res.status(400).json({
+          success: false,
+          error: 'store_id requis',
+        });
+        return;
+      }
+
+      if (!req.file) {
+        res.status(400).json({
+          success: false,
+          error: 'Fichier TSV manquant',
+        });
+        return;
+      }
+
+      const tsvContent = req.file.buffer.toString('utf-8');
+      const lines = tsvContent.split(/\r?\n/).filter((line) => line.trim().length > 0);
+      if (lines.length < 2) {
+        res.status(400).json({
+          success: false,
+          error: 'Fichier TSV vide ou sans données',
+        });
+        return;
+      }
+
+      const header = parseTsvLine(lines[0]);
+      const indexOf = (label: string) => header.findIndex((col) => col === label);
+
+      const idxDateTime = indexOf('Date Time');
+      const idxCustomerName = indexOf('Customer Name');
+      const idxCustomerEmail = indexOf('Customer Email');
+      const idxCustomerPhone = indexOf('Customer Phone');
+      const idxService = indexOf('Service');
+      const idxDuration = indexOf('Duration (mins.)');
+      const idxBookingId = indexOf('Booking Id');
+      const idxCustomFields = indexOf('Custom Fields');
+
+      if (idxDateTime === -1 || idxService === -1) {
+        res.status(400).json({
+          success: false,
+          error: 'Colonnes requises manquantes (Date Time, Service)',
+        });
+        return;
+      }
+
+      const servicesResult = await query<Service>(
+        'SELECT id, name, duration_minutes, service_type FROM services WHERE store_id = $1 AND active = true',
+        [storeId],
+      );
+
+      const serviceMap = new Map<string, Service>();
+      servicesResult.rows.forEach((service) => {
+        serviceMap.set(normalizeServiceKey(service.name), service);
+      });
+
+      const fittingFallback = servicesResult.rows.find((service) =>
+        normalizeServiceKey(service.name).includes('etude posturale'),
+      );
+
+      const created: string[] = [];
+      const updated: string[] = [];
+      const skipped: { line: number; reason: string }[] = [];
+      const errors: { line: number; reason: string }[] = [];
+
+      await transaction(async (client) => {
+        for (let i = 1; i < lines.length; i++) {
+          const lineNumber = i + 1;
+          const columns = parseTsvLine(lines[i]);
+          const row: ParsedTsvRow = {
+            dateTime: columns[idxDateTime] || '',
+            customerName: idxCustomerName !== -1 ? columns[idxCustomerName] : undefined,
+            customerEmail: idxCustomerEmail !== -1 ? columns[idxCustomerEmail] : undefined,
+            customerPhone: idxCustomerPhone !== -1 ? columns[idxCustomerPhone] : undefined,
+            serviceName: idxService !== -1 ? columns[idxService] : undefined,
+            durationMinutes: idxDuration !== -1 ? columns[idxDuration] : undefined,
+            bookingId: idxBookingId !== -1 ? columns[idxBookingId] : undefined,
+            customFields: idxCustomFields !== -1 ? columns[idxCustomFields] : undefined,
+          };
+
+          const start = parseTsvDateTime(row.dateTime);
+          if (!start) {
+            skipped.push({ line: lineNumber, reason: 'Date Time invalide ou manquant' });
+            continue;
+          }
+
+          const service = resolveServiceByName(
+            row.serviceName || '',
+            serviceMap,
+            fittingFallback,
+          );
+          if (!service) {
+            skipped.push({ line: lineNumber, reason: `Service introuvable: ${row.serviceName || 'N/A'}` });
+            continue;
+          }
+
+          const name = splitCustomerName(row.customerName || '');
+          if (!name || !row.customerEmail || !row.customerPhone) {
+            skipped.push({ line: lineNumber, reason: 'Client incomplet (nom/email/téléphone requis)' });
+            continue;
+          }
+
+          const duration = row.durationMinutes ? parseInt(row.durationMinutes, 10) : service.duration_minutes;
+          if (!duration || Number.isNaN(duration)) {
+            skipped.push({ line: lineNumber, reason: 'Durée invalide' });
+            continue;
+          }
+
+          const end = addMinutes(start, duration);
+          const bookingToken = row.bookingId
+            ? row.bookingId.length <= 64
+              ? row.bookingId
+              : crypto.createHash('sha256').update(row.bookingId).digest('hex')
+            : generateBookingToken();
+          const customFields = parseCustomFields(row.customFields || undefined);
+          const customerData = customFields ? { custom_fields: customFields } : {};
+
+          try {
+            const savepoint = `import_row_${lineNumber}`;
+            await client.query(`SAVEPOINT ${savepoint}`);
+            const existingResult = await client.query<Booking>(
+              'SELECT id FROM bookings WHERE booking_token = $1',
+              [bookingToken],
+            );
+
+            if (existingResult.rows.length > 0) {
+              if (mode === 'skip') {
+                skipped.push({ line: lineNumber, reason: 'Déjà existant (skip)' });
+                continue;
+              }
+
+              await client.query(
+                `UPDATE bookings
+                 SET store_id = $1,
+                     service_id = $2,
+                     start_datetime = $3,
+                     end_datetime = $4,
+                     customer_firstname = $5,
+                     customer_lastname = $6,
+                     customer_email = $7,
+                     customer_phone = $8,
+                     customer_data = $9,
+                     status = 'pending'
+                 WHERE booking_token = $10`,
+                [
+                  storeId,
+                  service.id,
+                  start,
+                  end,
+                  name.firstname,
+                  name.lastname,
+                  row.customerEmail,
+                  row.customerPhone,
+                  JSON.stringify(customerData),
+                  bookingToken,
+                ],
+              );
+              updated.push(bookingToken);
+            } else {
+              await client.query(
+                `INSERT INTO bookings (
+                  booking_token, store_id, service_id,
+                  start_datetime, end_datetime, status,
+                  customer_firstname, customer_lastname, customer_email, customer_phone,
+                  customer_data
+                ) VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7, $8, $9, $10)`,
+                [
+                  bookingToken,
+                  storeId,
+                  service.id,
+                  start,
+                  end,
+                  name.firstname,
+                  name.lastname,
+                  row.customerEmail,
+                  row.customerPhone,
+                  JSON.stringify(customerData),
+                ],
+              );
+              created.push(bookingToken);
+            }
+          } catch (rowError: any) {
+            const savepoint = `import_row_${lineNumber}`;
+            try {
+              await client.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+            } catch (rollbackError) {
+              console.error('Erreur rollback savepoint:', rollbackError);
+            }
+            errors.push({ line: lineNumber, reason: rowError?.message || 'Erreur insertion' });
+          }
+        }
+      });
+
+      res.json({
+        success: true,
+        data: {
+          created: created.length,
+          updated: updated.length,
+          skipped,
+          errors,
+        },
+      });
+    } catch (error: any) {
+      console.error('Erreur import TSV:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message || 'Erreur lors de l\'import TSV',
+      });
+    }
+  });
+};
+
+/**
  * Récupère les réservations d'un magasin
  */
 export const getStoreBookings = async (
@@ -491,6 +829,7 @@ export const getStoreBookings = async (
         srv.name as service_name,
         srv.service_type as service_type,
         srv.price as service_price,
+        srv.duration_minutes as service_duration,
         t.name as technician_name
       FROM bookings b
       JOIN services srv ON b.service_id = srv.id
@@ -563,14 +902,17 @@ export const updateBookingStatus = async (
 ): Promise<void> => {
   try {
     const { id } = req.params;
-    const { status, internal_notes } = req.body;
+    const { status, internal_notes, public_notes } = req.body;
 
     const result = await query<Booking>(
       `UPDATE bookings 
-       SET status = $1, internal_notes = COALESCE($2, internal_notes)
-       WHERE id = $3
+       SET status = $1, 
+           internal_notes = $2, 
+           public_notes = $3,
+           updated_at = NOW()
+       WHERE id = $4
        RETURNING *`,
-      [status, internal_notes || null, id],
+      [status, internal_notes || null, public_notes || null, id],
     );
 
     if (result.rows.length === 0) {
@@ -581,9 +923,46 @@ export const updateBookingStatus = async (
       return;
     }
 
+    const booking = result.rows[0];
+
+    // Si le nouveau statut est "annulé", envoyer l'email d'annulation
+    if (status === 'cancelled') {
+      try {
+        const detailsResult = await query<BookingWithDetails>(
+          `SELECT 
+            b.*,
+            srv.name as service_name,
+            srv.service_type,
+            srv.price as service_price,
+            srv.duration_minutes as service_duration,
+            st.name as store_name,
+            st.address as store_address,
+            st.city as store_city,
+            st.postal_code as store_postal_code,
+            st.phone as store_phone,
+            st.email as store_email,
+            t.name as technician_name
+          FROM bookings b
+          JOIN services srv ON b.service_id = srv.id
+          JOIN stores st ON b.store_id = st.id
+          LEFT JOIN technicians t ON b.technician_id = t.id
+          WHERE b.id = $1`,
+          [id],
+        );
+
+        if (detailsResult.rows.length > 0) {
+          const { sendCancellationEmail } = require('../utils/email');
+          await sendCancellationEmail(detailsResult.rows[0]);
+        }
+      } catch (emailError) {
+        console.error('Erreur lors de l\'envoi de l\'email d\'annulation (admin):', emailError);
+        // On ne bloque pas la réponse si l'email échoue
+      }
+    }
+
     res.json({
       success: true,
-      data: result.rows[0],
+      data: booking,
       message: 'Statut mis à jour avec succès',
     });
   } catch (error) {
@@ -591,6 +970,81 @@ export const updateBookingStatus = async (
     res.status(500).json({
       success: false,
       error: 'Erreur lors de la mise à jour du statut',
+    });
+  }
+};
+
+/**
+ * Termine une réservation et envoie un email personnalisé
+ */
+export const completeBooking = async (
+  req: Request,
+  res: Response,
+): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { templateId, customMessage, internal_notes, public_notes } = req.body;
+
+    // 1. Mettre à jour le statut en 'completed'
+    const updateResult = await query<Booking>(
+      `UPDATE bookings 
+       SET status = 'completed', 
+           internal_notes = $1, 
+           public_notes = $2,
+           updated_at = NOW()
+       WHERE id = $3
+       RETURNING *`,
+      [internal_notes || null, public_notes || null, id],
+    );
+
+    if (updateResult.rows.length === 0) {
+      res.status(404).json({
+        success: false,
+        error: 'Réservation non trouvée',
+      });
+      return;
+    }
+
+    const booking = updateResult.rows[0];
+
+    // 2. Récupérer les détails complets pour l'email
+    const detailsResult = await query<BookingWithDetails>(
+      `SELECT 
+        b.*,
+        srv.name as service_name,
+        srv.service_type,
+        srv.price as service_price,
+        srv.duration_minutes as service_duration,
+        st.name as store_name,
+        st.address as store_address,
+        st.city as store_city,
+        st.postal_code as store_postal_code,
+        st.phone as store_phone,
+        st.email as store_email,
+        t.name as technician_name
+      FROM bookings b
+      JOIN services srv ON b.service_id = srv.id
+      JOIN stores st ON b.store_id = st.id
+      LEFT JOIN technicians t ON b.technician_id = t.id
+      WHERE b.id = $1`,
+      [id],
+    );
+
+    if (detailsResult.rows.length > 0) {
+      const { sendCustomCompletionEmail } = require('../utils/email');
+      await sendCustomCompletionEmail(detailsResult.rows[0], templateId, customMessage);
+    }
+
+    res.json({
+      success: true,
+      data: booking,
+      message: 'Réservation terminée et email envoyé',
+    });
+  } catch (error) {
+    console.error('Erreur lors de la clôture de la réservation:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Erreur lors de la clôture de la réservation',
     });
   }
 };
@@ -641,11 +1095,79 @@ export const createAvailabilityBlock = async (
       reason,
       block_type,
       service_type,
+      quantity = 1,
+      cancel_conflicts = false,
     } = req.body;
 
+    const start = new Date(start_datetime);
+    const end = new Date(end_datetime);
+
+    // 1. Vérifier s'il y a des réservations en conflit
+    const conflictResult = await query<BookingWithDetails>(
+      `SELECT 
+        b.*,
+        srv.name as service_name,
+        srv.service_type,
+        st.name as store_name,
+        st.email as store_email,
+        st.phone as store_phone
+      FROM bookings b
+      JOIN services srv ON b.service_id = srv.id
+      JOIN stores st ON b.store_id = st.id
+      WHERE b.store_id = $1 
+      AND b.status IN ('confirmed', 'pending')
+      AND b.start_datetime < $2 
+      AND b.end_datetime > $3`,
+      [store_id, end, start]
+    );
+
+    const conflictingBookings = conflictResult.rows;
+
+    // 2. S'il y a des conflits et que l'admin n'a pas explicitement demandé de les annuler
+    if (conflictingBookings.length > 0 && !cancel_conflicts) {
+      res.status(409).json({
+        success: false,
+        error: 'CONFLICTING_BOOKINGS',
+        conflicts: conflictingBookings.map(b => ({
+          id: b.id,
+          customer_name: `${b.customer_firstname} ${b.customer_lastname}`,
+          start_datetime: b.start_datetime,
+          service_name: b.service_name,
+          status: b.status
+        })),
+        message: `${conflictingBookings.length} RDV existant(s) sur ce créneau.`,
+      });
+      return;
+    }
+
+    // 3. Si cancel_conflicts est vrai, annuler les RDV
+    if (conflictingBookings.length > 0 && cancel_conflicts) {
+      const { sendCancellationEmail } = require('../utils/email');
+      
+      for (const booking of conflictingBookings) {
+        await query(
+          `UPDATE bookings 
+           SET status = 'cancelled', 
+               cancelled_at = NOW(), 
+               cancellation_reason = $1,
+               internal_notes = COALESCE(internal_notes, '') || '\nAnnulé automatiquement suite à un blocage : ' || $2
+           WHERE id = $3`,
+          ['Annulation automatique suite à une fermeture exceptionnelle / blocage.', reason || 'Blocage admin', booking.id]
+        );
+
+        // Envoyer l'email d'annulation
+        try {
+          await sendCancellationEmail(booking);
+        } catch (emailError) {
+          console.error(`Erreur envoi email annulation automatique pour RDV ${booking.id}:`, emailError);
+        }
+      }
+    }
+
+    // 4. Créer le blocage
     const result = await query(
-      `INSERT INTO availability_blocks (store_id, technician_id, start_datetime, end_datetime, reason, block_type, service_type)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
+      `INSERT INTO availability_blocks (store_id, technician_id, start_datetime, end_datetime, reason, block_type, service_type, quantity)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
        RETURNING *`,
       [
         store_id,
@@ -655,13 +1177,16 @@ export const createAvailabilityBlock = async (
         reason || null,
         block_type || 'other',
         service_type || null,
+        quantity,
       ],
     );
 
     res.status(201).json({
       success: true,
       data: result.rows[0],
-      message: 'Blocage créé avec succès',
+      message: conflictingBookings.length > 0 
+        ? `Blocage créé et ${conflictingBookings.length} RDV annulé(s).` 
+        : 'Blocage créé avec succès',
     });
   } catch (error) {
     console.error('Erreur lors de la création du blocage:', error);

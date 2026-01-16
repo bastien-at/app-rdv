@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "images.fullname" . }}
+  labels:
+    {{- include "images.labels" . | nindent 4 }}
+spec:
+  {{- with .Values.strategy }}
+  strategy:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "images.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "images.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "images.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+{{- if .Values.env }}
+          env:
+          {{- range $name, $value := .Values.env }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+          {{- end }}
+{{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.imgproxyPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.imgproxyPort }}
+            periodSeconds: 60
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.imgproxyPort }}
+          resources:
+            {{- toYaml .Values.image.resources | nindent 12 }}
+          volumeMounts:
+            - name: shared-onfly-images
+              mountPath: /files/onfly
+              readOnly: true
+        - name: {{ .Chart.Name }}-proxy
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.proxy.repository }}:{{ .Values.proxy.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.proxy.pullPolicy }}
+{{- if .Values.proxy.env }}
+          env:
+          {{- range $name, $value := .Values.proxy.env }}
+            - name: {{ $name }}
+              value: {{ $value | quote }}
+          {{- end }}
+{{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+            periodSeconds: 60
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.service.port }}
+          resources:
+            {{- toYaml .Values.proxy.resources | nindent 12 }}
+          volumeMounts:
+{{- if .Values.global.configFiles }}
+          {{- range $name, $value := .Values.global.configFiles }}
+            - name: nginx-proxy-config
+              mountPath: {{ $value.mountPath | quote }}
+              subPath: {{ $value.subPath | quote }}
+          {{- end }}
+{{- end }}
+            - name: shared-onfly-images
+              mountPath: /files/onfly
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: shared-onfly-images
+          emptyDir: {}
+{{- if .Values.global.configFiles }}
+        - name: nginx-proxy-config
+          configMap:
+            name: {{ .Chart.Name }}-configmap
+            defaultMode: 0755
+{{- end }}

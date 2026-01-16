@@ -26,7 +26,10 @@ export const query = async <T extends QueryResultRow = any>(
 ): Promise<QueryResult<T>> => {
   const start = Date.now();
   try {
-    const res = await pool.query<T>(text, params);
+    const client = await pool.connect();
+    await client.query("SET timezone = 'Europe/Paris'");
+    const res = await client.query<T>(text, params);
+    client.release();
     const duration = Date.now() - start;
     
     if (process.env.NODE_ENV === 'development') {

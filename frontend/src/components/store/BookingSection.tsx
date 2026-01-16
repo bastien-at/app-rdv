@@ -122,9 +122,38 @@ export default function BookingSection({
   const nextMonth = () => setCurrentMonth(prev => addMonths(prev, 1));
 
   const getDaysInMonth = () => {
-    const start = startOfMonth(currentMonth);
-    const end = endOfMonth(currentMonth);
-    return eachDayOfInterval({ start, end });
+    try {
+      // 1. Garantir un objet Date valide pour le mois en cours
+      const baseDate = currentMonth instanceof Date && !isNaN(currentMonth.getTime()) 
+        ? currentMonth 
+        : new Date();
+
+      // 2. Calculer le premier jour du mois à midi pour éviter les décalages UTC
+      const year = baseDate.getFullYear();
+      const month = baseDate.getMonth();
+      const firstDayOfMonth = new Date(year, month, 1, 12, 0, 0);
+      
+      // 3. Calculer le nombre de jours dans le mois
+      const lastDayOfMonth = new Date(year, month + 1, 0, 12, 0, 0);
+      const daysInMonth = lastDayOfMonth.getDate();
+      
+      // 4. Créer le tableau des jours (tous à midi pour éviter les décalages)
+      const days = Array.from({ length: daysInMonth }, (_, i) => 
+        new Date(year, month, i + 1, 12, 0, 0)
+      );
+      
+      // 5. Calculer le padding (Lundi=1, ..., Samedi=6, Dimanche=0)
+      // On veut Lundi en premier (index 0)
+      const dayOfWeek = firstDayOfMonth.getDay(); 
+      const paddingCount = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const padding = Array(paddingCount).fill(null);
+      
+      return [...padding, ...days];
+    } catch (err) {
+      console.error("Erreur critique calendrier:", err);
+      // Fallback minimal pour ne pas casser le rendu
+      return [];
+    }
   };
 
   if (!selectedService) return null;
@@ -220,9 +249,12 @@ export default function BookingSection({
                       </div>
                     ))}
                     {getDaysInMonth().map((day, i) => {
+                      if (!day) {
+                        return <div key={`empty-${i}`} className="aspect-square" />;
+                      }
                       const isPast = isBefore(day, startOfDay(new Date()));
-                      const isSelected = selectedDate && isSameDay(day, selectedDate);
-                      const isCurrentDay = isToday(day);
+                      const isSelected = selectedDate && day && isSameDay(day, selectedDate);
+                      const isCurrentDay = day && isToday(day);
 
                       return (
                         <button

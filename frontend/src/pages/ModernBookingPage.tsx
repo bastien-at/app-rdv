@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { ChevronLeft, ChevronRight, Clock, User, Calendar as CalendarIcon, Mail, Phone, Bike, Wrench, Check, MapPin, Search, HelpCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Clock, User, Calendar as CalendarIcon, Mail, Phone, Bike, Wrench, Check, MapPin, Search, HelpCircle, LayoutDashboard } from 'lucide-react';
 import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, isBefore, startOfDay, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Button from '../components/Button';
@@ -27,6 +27,7 @@ export default function ModernBookingPage() {
   const [store, setStore] = useState<Store | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [serviceSearchQuery, setServiceSearchQuery] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
@@ -49,29 +50,51 @@ export default function ModernBookingPage() {
     acceptTerms: false,
   });
 
+  // Scroll to top on step change
   useEffect(() => {
-    const token = localStorage.getItem('admin_token');
-    setIsAdmin(!!token);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [step]);
+
+  // Check admin status
+  useEffect(() => {
+    const checkAdmin = () => {
+      const token = localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token');
+      setIsAdmin(!!token);
+    };
+
+    checkAdmin();
+    window.addEventListener('storage', checkAdmin);
+    return () => window.removeEventListener('storage', checkAdmin);
   }, []);
 
+  // Customer search with abort controller
   useEffect(() => {
+    if (customerSearchQuery.length < 2 || !storeId) {
+      setCustomerSearchResults([]);
+      setShowCustomerResults(false);
+      return;
+    }
+
+    const controller = new AbortController();
+    
     const search = async () => {
-      if (customerSearchQuery.length >= 2 && storeId) {
-        try {
-          const results = await searchCustomers(storeId, customerSearchQuery);
-          setCustomerSearchResults(results);
-          setShowCustomerResults(true);
-        } catch (error) {
+      try {
+        const results = await searchCustomers(storeId, customerSearchQuery);
+        setCustomerSearchResults(results);
+        setShowCustomerResults(true);
+      } catch (error: any) {
+        if (error.name !== 'AbortError') {
           console.error('Erreur recherche client:', error);
         }
-      } else {
-        setCustomerSearchResults([]);
-        setShowCustomerResults(false);
       }
     };
 
     const timeoutId = setTimeout(search, 300);
-    return () => clearTimeout(timeoutId);
+    
+    return () => {
+      clearTimeout(timeoutId);
+      controller.abort();
+    };
   }, [customerSearchQuery, storeId]);
 
   const handleCustomerSelect = (customer: CustomerSearchResult) => {
@@ -86,89 +109,116 @@ export default function ModernBookingPage() {
     setShowCustomerResults(false);
   };
 
+  // Load store data (single useEffect)
   useEffect(() => {
-    if (storeSlug) {
-      resolveStoreId();
-    }
-  }, [storeSlug]);
-  
-  useEffect(() => {
-    if (storeId) {
-      loadStoreData();
-    }
-  }, [storeId]);
+    const loadStore = async () => {
+      if (!storeSlug) return;
+      
+      setLoading(true);
+      try {
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storeSlug);
+        
+        // Load store
+        const storeData = isUUID 
+          ? await getStoreById(storeSlug) 
+          : await getStoreBySlug(storeSlug);
+        
+        setStore(storeData);
+        setStoreId(storeData.id);
+        
+        // Load services
+        const servicesData = await getStoreServices(storeData.id);
+        
+        // Filter services based on store configuration
+        let availableServices = servicesData;
+        if (storeData.has_workshop === false) {
+          availableServices = availableServices.filter((s: any) => s.service_type !== 'workshop');
+        }
+        if (storeData.has_fitting === false) {
+          availableServices = availableServices.filter((s: any) => s.service_type !== 'fitting');
+        }
 
+        const filteredServices = serviceType 
+          ? availableServices.filter((s: any) => s.service_type === serviceType)
+          : availableServices;
+        
+        setServices(filteredServices);
+        
+        // Auto-select if only one service
+        if (filteredServices.length === 1) {
+          setSelectedService(filteredServices[0]);
+          setStep('date');
+        }
+      } catch (error) {
+        console.error('❌ Magasin non trouvé:', error);
+        alert('Magasin non trouvé');
+        navigate('/stores');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadStore();
+  }, [storeSlug, serviceType, navigate]);
+
+  // Load availability for selected date
   useEffect(() => {
     if (selectedService && selectedDate) {
       loadAvailability();
     }
   }, [selectedService, selectedDate]);
 
-  const resolveStoreId = async () => {
-    if (!storeSlug) return;
+  // Prefetch month availability
+  useEffect(() => {
+    if (step === 'date' && selectedService && storeId) {
+      prefetchMonthAvailability();
+    }
+  }, [currentMonth, selectedService, step, storeId]);
+
+  const prefetchMonthAvailability = async () => {
+    if (!selectedService || !storeId) return;
+    
+    const days = getDaysInMonth().filter(day => {
+      if (!day) return false; // Filtrer les valeurs null du padding
+      const isPast = isBefore(day, startOfDay(new Date()));
+      const isSunday = day.getDay() === 0;
+      return !isPast && !isSunday;
+    });
     
     try {
-      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(storeSlug);
+      const checks = await Promise.all(
+        days.map(async (day) => {
+          const dateStr = format(day, 'yyyy-MM-dd');
+          try {
+            const slots = await getAvailability(storeId, selectedService.id, dateStr);
+            return { 
+              date: dateStr, 
+              isFullyBooked: slots.length > 0 && slots.every(s => s.available === false) 
+            };
+          } catch {
+            return { date: dateStr, isFullyBooked: false };
+          }
+        })
+      );
       
-      let storeData;
-      if (isUUID) {
-        storeData = await getStoreById(storeSlug);
-      } else {
-        storeData = await getStoreBySlug(storeSlug);
-      }
-      setStoreId(storeData.id);
+      setFullyBookedDates(new Set(
+        checks.filter(c => c.isFullyBooked).map(c => c.date)
+      ));
     } catch (error) {
-      console.error('❌ Magasin non trouvé:', error);
-      alert('Magasin non trouvé');
-      navigate('/stores');
-    }
-  };
-
-  const loadStoreData = async () => {
-    setLoading(true);
-    try {
-      const [storeData, servicesData] = await Promise.all([
-        getStoreById(storeId!),
-        getStoreServices(storeId!),
-      ]);
-      setStore(storeData);
-      
-      // Filtrer les services selon la configuration du magasin
-      let availableServices = servicesData;
-      if (storeData.has_workshop === false) {
-        availableServices = availableServices.filter((s: any) => s.service_type !== 'workshop');
-      }
-      if (storeData.has_fitting === false) {
-        availableServices = availableServices.filter((s: any) => s.service_type !== 'fitting');
-      }
-
-      const filteredServices = serviceType 
-        ? availableServices.filter((s: any) => s.service_type === serviceType)
-        : availableServices;
-      
-      setServices(filteredServices);
-      
-      if (filteredServices.length === 1) {
-        setSelectedService(filteredServices[0]);
-        setStep('date');
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement:', error);
-    } finally {
-      setLoading(false);
+      console.error('Erreur prefetch disponibilités:', error);
     }
   };
 
   const loadAvailability = async () => {
-    if (!selectedService || !selectedDate) return;
+    if (!selectedService || !selectedDate || !storeId) return;
     
     setLoading(true);
     try {
       const dateStr = format(selectedDate, 'yyyy-MM-dd');
-      const slots = await getAvailability(storeId!, selectedService.id, dateStr);
+      const slots = await getAvailability(storeId, selectedService.id, dateStr);
       setAvailableSlots(slots);
 
-      // Mettre à jour les journées complètes
+      // Update fully booked dates
       setFullyBookedDates(prev => {
         const next = new Set(prev);
         if (slots.length > 0 && slots.every(slot => slot.available === false)) {
@@ -190,12 +240,22 @@ export default function ModernBookingPage() {
     setStep('date');
   };
 
+  const filteredServices = services.filter((service) => {
+    const query = serviceSearchQuery.trim().toLowerCase();
+    if (!query) return true;
+    const name = service.name?.toLowerCase() || '';
+    const description = service.description?.toLowerCase() || '';
+    return name.includes(query) || description.includes(query);
+  });
+
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
     setSelectedSlot(null);
   };
 
   const handleSlotSelect = (slot: TimeSlot) => {
+    // Prevent selecting booked slots unless admin
+    if (!isAdmin && slot.available === false) return;
     setSelectedSlot(slot);
   };
 
@@ -203,6 +263,9 @@ export default function ModernBookingPage() {
     if (!selectedSlot) return;
     setStep('form');
   };
+
+  const validateEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const validatePhone = (phone: string) => /^(?:(?:\+|00)33|0)\s*[1-9](?:[\s.-]*\d{2}){4}$/.test(phone);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -212,8 +275,22 @@ export default function ModernBookingPage() {
       alert('Veuillez sélectionner un service et un créneau horaire.');
       return;
     }
+
+    // Validation
+    if (!validateEmail(formData.email)) {
+      alert('Format email invalide');
+      return;
+    }
+    if (!validatePhone(formData.phone)) {
+      alert('Format téléphone invalide (ex: 06 12 34 56 78)');
+      return;
+    }
     
     setSubmitting(true);
+    
+    // Status logic: confirmed if admin, pending otherwise
+    const targetStatus = isAdmin ? 'confirmed' : 'pending';
+    const source = isAdmin ? 'admin' : 'customer';
     
     try {
       const bookingData: CreateBookingData = {
@@ -225,6 +302,8 @@ export default function ModernBookingPage() {
         customer_lastname: formData.lastname,
         customer_email: formData.email,
         customer_phone: formData.phone,
+        status: targetStatus,
+        source: source,
         customer_data: {
           height: formData.height ? parseInt(formData.height) : undefined,
           weight: formData.weight ? parseInt(formData.weight) : undefined,
@@ -235,10 +314,13 @@ export default function ModernBookingPage() {
         },
       };
       
-      console.log('📤 Envoi de la réservation:', bookingData);
       const booking = await createBooking(bookingData);
-      console.log('✅ Réservation créée:', booking);
-      navigate(`/booking/${booking.booking_token}`);
+      
+      if (isAdmin) {
+        navigate('/admin/planning');
+      } else {
+        navigate(`/booking/${booking.booking_token}`);
+      }
     } catch (error: any) {
       console.error('❌ Erreur lors de la création de la réservation:', error);
       console.error('Détails:', error.response?.data || error.message);
@@ -248,13 +330,49 @@ export default function ModernBookingPage() {
     }
   };
 
+  const handleBack = () => {
+    if (step === 'form' && Object.values(formData).some((v) => v !== '' && v !== 'own' && v !== false)) {
+      if (!confirm('Voulez-vous vraiment quitter ? Les données saisies seront perdues.')) return;
+    }
+    navigate(-1);
+  };
+
   const previousMonth = () => setCurrentMonth(prev => addMonths(prev, -1));
   const nextMonth = () => setCurrentMonth(prev => addMonths(prev, 1));
 
   const getDaysInMonth = () => {
-    const start = startOfMonth(currentMonth);
-    const end = endOfMonth(currentMonth);
-    return eachDayOfInterval({ start, end });
+    try {
+      // 1. Garantir un objet Date valide pour le mois en cours
+      const baseDate = currentMonth instanceof Date && !isNaN(currentMonth.getTime()) 
+        ? currentMonth 
+        : new Date();
+
+      // 2. Calculer le premier jour du mois à midi pour éviter les décalages UTC
+      const year = baseDate.getFullYear();
+      const month = baseDate.getMonth();
+      const firstDayOfMonth = new Date(year, month, 1, 12, 0, 0);
+      
+      // 3. Calculer le nombre de jours dans le mois
+      const lastDayOfMonth = new Date(year, month + 1, 0, 12, 0, 0);
+      const daysInMonth = lastDayOfMonth.getDate();
+      
+      // 4. Créer le tableau des jours (tous à midi pour éviter les décalages)
+      const days = Array.from({ length: daysInMonth }, (_, i) => 
+        new Date(year, month, i + 1, 12, 0, 0)
+      );
+      
+      // 5. Calculer le padding (Lundi=1, ..., Samedi=6, Dimanche=0)
+      // On veut Lundi en premier (index 0)
+      const dayOfWeek = firstDayOfMonth.getDay(); 
+      const paddingCount = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      const padding = Array(paddingCount).fill(null);
+      
+      return [...padding, ...days];
+    } catch (err) {
+      console.error("Erreur critique calendrier:", err);
+      // Fallback minimal pour ne pas casser le rendu
+      return [];
+    }
   };
 
   if (!store) {
@@ -295,7 +413,7 @@ export default function ModernBookingPage() {
         <div className="container mx-auto px-4 flex items-center justify-between h-14">
           <div className="w-[180px] flex justify-start">
             <button
-              onClick={() => navigate(-1)}
+              onClick={handleBack}
               className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-white/20 transition-all text-white font-bold text-sm"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -312,7 +430,18 @@ export default function ModernBookingPage() {
             />
           </div>
 
-          <div className="w-[180px]" />
+          <div className="w-[180px] flex justify-end gap-2">
+            {isAdmin && (
+              <button
+                onClick={() => navigate('/admin/planning')}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 transition-all text-white font-bold text-sm border border-white/20"
+                title="Accéder au planning admin"
+              >
+                <LayoutDashboard className="h-4 w-4" />
+                <span className="hidden md:inline">Planning</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -355,12 +484,33 @@ export default function ModernBookingPage() {
             )}
 
             {/* Step Content */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 relative">
+              {isAdmin && (
+                <div className="absolute -top-3 -right-3 sm:top-2 sm:right-2 bg-red-500 text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg z-50">
+                  ADMIN
+                </div>
+              )}
+              
               {step === 'service' && (
                 <div className="space-y-4">
                   <h2 className="text-xl font-extrabold text-[#142129]">Choisissez votre service</h2>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-2">
+                      Rechercher une prestation
+                    </label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={serviceSearchQuery}
+                        onChange={(e) => setServiceSearchQuery(e.target.value)}
+                        placeholder="Nom ou description..."
+                        className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#005162] focus:border-transparent"
+                      />
+                    </div>
+                  </div>
                   <div className="space-y-3">
-                    {services.map((service) => (
+                    {filteredServices.map((service) => (
                       <button
                         key={service.id}
                         onClick={() => handleServiceSelect(service)}
@@ -389,6 +539,11 @@ export default function ModernBookingPage() {
                         </div>
                       </button>
                     ))}
+                    {filteredServices.length === 0 && (
+                      <div className="text-center text-sm text-gray-500 py-6">
+                        Aucune prestation ne correspond à votre recherche.
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -438,10 +593,13 @@ export default function ModernBookingPage() {
                       </div>
                       <div className="grid grid-cols-7 gap-1">
                         {getDaysInMonth().map((day, i) => {
+                          if (!day) {
+                            return <div key={`empty-${i}`} className="aspect-square" />;
+                          }
                           const isPast = isBefore(day, startOfDay(new Date()));
-                          const isSelected = selectedDate && isSameDay(day, selectedDate);
-                          const isCurrentDay = isToday(day);
-                          const isSunday = day.getDay() === 0;
+                          const isSelected = selectedDate && day && isSameDay(day, selectedDate);
+                          const isCurrentDay = day && isToday(day);
+                          const isSunday = day && day.getDay() === 0;
                           const dayStr = format(day, 'yyyy-MM-dd');
                           const isFullyBooked = fullyBookedDates.has(dayStr);
                           const isDisabled = isPast || isSunday || isFullyBooked;
@@ -482,16 +640,18 @@ export default function ModernBookingPage() {
                         </div>
                       ) : (
                         <div className="grid grid-cols-3 gap-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                          {availableSlots.map((slot, i) => {
+                          {availableSlots
+                            .filter(slot => isAdmin || slot.available !== false)
+                            .map((slot, i) => {
                             const isBooked = slot.available === false;
                             return (
                               <button
                                 key={i}
-                                onClick={() => !isBooked && handleSlotSelect(slot)}
-                                disabled={isBooked}
+                                onClick={() => handleSlotSelect(slot)}
+                                disabled={!isAdmin && isBooked}
                                 className={`py-1.5 px-1 rounded-md text-xs font-medium transition-all
                                   ${isBooked
-                                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed line-through'
+                                    ? 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed opacity-60'
                                     : selectedSlot === slot
                                       ? 'bg-[#005162] text-white shadow-sm'
                                       : 'bg-white border border-gray-200 text-gray-700 hover:border-[#005162] hover:text-[#005162]'
@@ -499,6 +659,7 @@ export default function ModernBookingPage() {
                                 `}
                               >
                                 {format(new Date(slot.start_datetime), 'HH:mm')}
+                                {isBooked && isAdmin && <span className="block text-[8px] font-bold">(Complet)</span>}
                               </button>
                             );
                           })}
@@ -523,12 +684,6 @@ export default function ModernBookingPage() {
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <h2 className="text-xl font-extrabold text-[#142129]">Vos informations</h2>
-                    <button
-                      onClick={() => setStep('date')}
-                      className="text-xs text-[#005162] font-semibold hover:underline"
-                    >
-                      Modifier
-                    </button>
                   </div>
 
                   {isAdmin && (
@@ -597,7 +752,7 @@ export default function ModernBookingPage() {
                     />
 
                     <Input
-                      label="Téléphone *"
+                      label="Téléphone * (ex: 06 12 34 56 78)"
                       type="tel"
                       value={formData.phone}
                       onChange={(e) => setFormData({ ...formData, phone: e.target.value })}

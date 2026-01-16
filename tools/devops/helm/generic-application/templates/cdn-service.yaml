@@ -1,0 +1,35 @@
+{{- if .Values.cdn.enabled -}}
+{{- $fullName := include "fullname" . -}}
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullName }}-cdn
+  labels:
+    app: {{ template "name" . }}
+    {{- include "labels" . | nindent 4 }}
+  annotations:
+    cloud.google.com/backend-config: '{"default": "{{ $fullName }}-cdn"}'
+    cloud.google.com/neg: '{"ingress": true}'
+  {{- with .Values.cdn.service.annotations }}
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.cdn.service.type }}
+  {{- if eq .Values.cdn.service.type "NodePort" }}
+  {{- if .Values.cdn.service.externalTrafficPolicy }}
+  externalTrafficPolicy: {{ .Values.cdn.service.externalTrafficPolicy | quote }}
+  {{- end }}
+  {{- end }}
+  ports:
+    {{- range $name, $value := .Values.cdn.service.ports }}
+    - name: {{ $name }}
+      port: {{ $value }}
+      targetPort: {{ $name }}
+    {{- end }}
+  selector:
+    {{- include "selectorLabels" . | nindent 4 }}
+    {{- if .Values.blueGreen.enabled }}
+    blue-green: {{ include "blueGreenToTrafficCdn" . }}
+    {{ end }}
+{{- end }}

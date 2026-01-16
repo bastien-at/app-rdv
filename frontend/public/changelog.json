@@ -1,4 +1,60 @@
 {
-  "generatedAt": "1970-01-01T00:00:00.000Z",
-  "entries": []
+  "generatedAt": "2026-01-16T15:22:00.000Z",
+  "entries": [
+    {
+      "hash": "local",
+      "message": "feat: import TSV des RDV (admin) avec mode update/skip, statut pending par défaut et sans emails",
+      "date": "2026-01-16"
+    },
+    {
+      "hash": "fbb772c",
+      "message": "fix: align admin month view grid with week view (pad weeks and remove Sunday column)",
+      "date": "2026-01-16"
+    },
+    {
+      "hash": "34af75d",
+      "message": "fix: admin routing + logout cookie cleanup + admin shortcut in booking flow",
+      "date": "2026-01-16"
+    },
+    {
+      "hash": "81e0483",
+      "message": "fix: remove double padding and add null-check in prefetchMonthAvailability to prevent TypeError on getDay()",
+      "date": "2026-01-13"
+    },
+    {
+      "hash": "9ca254d",
+      "message": "fix: remove startOfMonth() to prevent UTC offset in calendar day calculation",
+      "date": "2026-01-13"
+    },
+    {
+      "hash": "2566d84",
+      "message": "fix: ultra-robust calendar logic with null-checks and timezone-safe date handling to prevent TypeError on getDay()",
+      "date": "2026-01-13"
+    },
+    {
+      "hash": "678aac9",
+      "message": "fix: explicit calendar padding logic for correct day alignment",
+      "date": "2026-01-13"
+    },
+    {
+      "hash": "eec38e2",
+      "message": "fix: resolve git conflicts in adminController.ts and merge availability block logic",
+      "date": "2026-01-13"
+    },
+    {
+      "hash": "c373b2f",
+      "message": "fix: additional timezone and UI improvements for admin pages",
+      "date": "2026-01-13"
+    },
+    {
+      "hash": "c0b861a",
+      "message": "fix: force timezone Europe/Paris in backend and database session to avoid date offset in production",
+      "date": "2026-01-13"
+    },
+    {
+      "hash": "8cedd31",
+      "message": "feat: update changelog and show commit messages in admin login page",
+      "date": "2026-01-13"
+    }
+  ]
 }

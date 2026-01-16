@@ -7,15 +7,23 @@ import { adminLogin } from '../../services/api';
 
 type ChangelogEntry = {
   hash: string;
-  author: string;
   date: string;
-  subject: string;
+  message: string;
 };
 
 type ChangelogData = {
   generatedAt: string;
   entries: ChangelogEntry[];
 };
+
+interface AppInfo {
+  version: string;
+  changelog?: Array<{
+    version: string;
+    date?: string;
+    changes?: string[];
+  }>;
+}
 
 export default function AdminLoginPage() {
   const navigate = useNavigate();
@@ -24,6 +32,56 @@ export default function AdminLoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
+  const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
+
+  const getLatestVersion = (info: AppInfo | null) => {
+    if (!info) return null;
+    const versions = (info.changelog || []).map((c: any) => c.version).filter(Boolean);
+    if (versions.length === 0) return info.version || null;
+
+    const parse = (v: string) => v.split('.').map((x) => Number.parseInt(x, 10) || 0);
+    const cmp = (a: string, b: string) => {
+      const pa = parse(a);
+      const pb = parse(b);
+      const len = Math.max(pa.length, pb.length);
+      for (let i = 0; i < len; i++) {
+        const da = pa[i] ?? 0;
+        const db = pb[i] ?? 0;
+        if (da !== db) return da - db;
+      }
+      return 0;
+    };
+
+    return versions.sort(cmp).at(-1) || info.version || null;
+  };
+
+  useEffect(() => {
+    // Rediriger vers le dashboard si déjà connecté
+    const token = localStorage.getItem('admin_token') || sessionStorage.getItem('admin_token');
+    if (token) {
+      navigate('/admin/planning');
+    }
+
+    let isMounted = true;
+
+    const loadAppInfo = async () => {
+      try {
+        const res = await fetch('/app-info.json', { cache: 'no-cache' });
+        if (!res.ok) return;
+        const data = (await res.json()) as AppInfo;
+        if (!isMounted) return;
+        if (data && typeof data.version === 'string') setAppInfo(data);
+      } catch {
+        // Ignore
+      }
+    };
+
+    loadAppInfo();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const [changelog, setChangelog] = useState<ChangelogData | null>(null);
 
@@ -167,14 +225,17 @@ export default function AdminLoginPage() {
               Me connecter
             </Button>
           </form>
+
+          {getLatestVersion(appInfo) ? (
+            <div className="mt-5 text-center text-xs text-gray-400">
+              Version {getLatestVersion(appInfo)}
+            </div>
+          ) : null}
         </Card>
 
         <div className="mt-4 text-xs text-gray-500">
           <div className="flex items-center justify-between">
-            <span>
-              Version {appVersion || '—'}
-              {appGitSha ? ` (${appGitSha.slice(0, 7)})` : ''}
-            </span>
+          
             {changelog?.generatedAt ? (
               <span>
                 Changelog {new Date(changelog.generatedAt).toLocaleString()}
@@ -189,11 +250,11 @@ export default function AdminLoginPage() {
                 {changelog.entries.slice(0, 10).map((entry) => (
                   <div key={entry.hash} className="text-gray-600">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="truncate">{entry.subject}</span>
-                      <span className="shrink-0">{entry.hash.slice(0, 7)}</span>
+                      <span className="truncate">{entry.message}</span>
+                      <span className="shrink-0 font-mono text-[10px]">{entry.hash.slice(0, 7)}</span>
                     </div>
                     <div className="text-[11px] text-gray-400">
-                      {new Date(entry.date).toLocaleString()} · {entry.author}
+                      {new Date(entry.date).toLocaleDateString()}
                     </div>
                   </div>
                 ))}

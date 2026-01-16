@@ -1,0 +1,15 @@
+{{- if and (.Values.serviceAccount.create) (.Values.serviceAccount.workloadIdentity) -}}
+apiVersion: iam.cnrm.cloud.google.com/v1beta1
+kind: IAMPartialPolicy
+metadata:
+  name: {{ template "fullname" . }}
+spec:
+  resourceRef:
+    apiVersion: iam.cnrm.cloud.google.com/v1beta1
+    kind: IAMServiceAccount
+    external: {{ .Values.serviceAccount.googleServiceAccount }}
+  bindings:
+    - role: roles/iam.workloadIdentityUser
+      members:
+        - member: serviceAccount:{{ .Values.serviceAccount.workloadIdentity }}
+{{- end }}

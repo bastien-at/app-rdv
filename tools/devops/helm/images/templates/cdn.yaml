@@ -1,0 +1,42 @@
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: {{ include "images.fullname" . }}
+  labels:
+    {{- include "images.labels" . | nindent 4 }}
+spec:
+  #healthCheck:
+  #  checkIntervalSec: 10
+  #  timeoutSec: 10
+  #  healthyThreshold: 2
+  #  unhealthyThreshold: 3
+  #  type: HTTP
+  #  requestPath: /health
+  #  port: 80
+  cdn:
+    enabled: true
+    {{- toYaml .Values.cdn | nindent 4 }}
+---
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: {{ include "images.fullname" . }}
+  labels:
+    {{- include "images.labels" . | nindent 4 }}
+spec:
+  redirectToHttps:
+    enabled: true
+    responseCodeName: MOVED_PERMANENTLY_DEFAULT
+{{- if .Values.ingress.hostname }}
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: {{ include "images.fullname" . }}
+  labels:
+    {{- include "images.labels" . | nindent 4 }}
+spec:
+  domains:
+    - {{ .Values.ingress.hostname | quote }}
+{{- end }}
+
