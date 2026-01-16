@@ -772,16 +772,20 @@ export default function PlanningPage() {
   };
 
   const getBookingDurationMinutes = (booking: Booking): number => {
+    const start = new Date(booking.start_datetime);
+    const end = new Date(booking.end_datetime);
+    const diffMs = end.getTime() - start.getTime();
+    const durationFromDates = Math.max(0, Math.round(diffMs / 60000));
+    if (durationFromDates > 0) {
+      return durationFromDates;
+    }
     if (
       typeof booking.service_duration === 'number' &&
       booking.service_duration > 0
     ) {
       return booking.service_duration;
     }
-    const start = new Date(booking.start_datetime);
-    const end = new Date(booking.end_datetime);
-    const diffMs = end.getTime() - start.getTime();
-    return Math.max(0, Math.round(diffMs / 60000));
+    return 0;
   };
 
   const getBookingGridPlacement = (

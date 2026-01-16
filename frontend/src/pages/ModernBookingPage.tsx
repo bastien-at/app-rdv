@@ -27,6 +27,7 @@ export default function ModernBookingPage() {
   const [store, setStore] = useState<Store | null>(null);
   const [services, setServices] = useState<Service[]>([]);
   const [selectedService, setSelectedService] = useState<Service | null>(null);
+  const [serviceSearchQuery, setServiceSearchQuery] = useState('');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
@@ -238,6 +239,14 @@ export default function ModernBookingPage() {
     setSelectedService(service);
     setStep('date');
   };
+
+  const filteredServices = services.filter((service) => {
+    const query = serviceSearchQuery.trim().toLowerCase();
+    if (!query) return true;
+    const name = service.name?.toLowerCase() || '';
+    const description = service.description?.toLowerCase() || '';
+    return name.includes(query) || description.includes(query);
+  });
 
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date);
@@ -485,8 +494,23 @@ export default function ModernBookingPage() {
               {step === 'service' && (
                 <div className="space-y-4">
                   <h2 className="text-xl font-extrabold text-[#142129]">Choisissez votre service</h2>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-2">
+                      Rechercher une prestation
+                    </label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        value={serviceSearchQuery}
+                        onChange={(e) => setServiceSearchQuery(e.target.value)}
+                        placeholder="Nom ou description..."
+                        className="w-full pl-9 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-[#005162] focus:border-transparent"
+                      />
+                    </div>
+                  </div>
                   <div className="space-y-3">
-                    {services.map((service) => (
+                    {filteredServices.map((service) => (
                       <button
                         key={service.id}
                         onClick={() => handleServiceSelect(service)}
@@ -515,6 +539,11 @@ export default function ModernBookingPage() {
                         </div>
                       </button>
                     ))}
+                    {filteredServices.length === 0 && (
+                      <div className="text-center text-sm text-gray-500 py-6">
+                        Aucune prestation ne correspond à votre recherche.
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
