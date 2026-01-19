@@ -57,6 +57,14 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
   const [completionMessage, setCompletionMessage] = useState('');
   const [completionLoading, setCompletionLoading] = useState(false);
   const [store, setStore] = useState<Store | null>(null);
+  const [additionalServices, setAdditionalServices] = useState<
+    { id?: string; name: string; price?: number }[]
+  >([]);
+  const [additionalServiceId, setAdditionalServiceId] = useState<string>('');
+  const [additionalServiceName, setAdditionalServiceName] = useState('');
+  const [additionalServicePrice, setAdditionalServicePrice] = useState<string>('');
+  const getAdditionalServicesStorageKey = (bookingId: string) =>
+    `admin_booking_additional_services_${bookingId}`;
 
   const getInspectionPhotoUrl = (photoUrl: string) => {
     if (!photoUrl) return '';
@@ -67,6 +75,37 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
     const backendOrigin = API_BASE_URL.replace(/\/api\/?$/, '');
     const normalizedPath = photoUrl.startsWith('/') ? photoUrl : `/${photoUrl}`;
     return `${backendOrigin}${normalizedPath}`;
+  };
+
+  const handleAddAdditionalService = () => {
+    const name = (additionalServiceName || selectedAdditionalService?.name || '').trim();
+    if (!name) {
+      alert('Merci de renseigner une prestation à ajouter');
+      return;
+    }
+    const hasPriceInput = additionalServicePrice.trim().length > 0;
+    const parsedPrice = hasPriceInput
+      ? Number(additionalServicePrice.replace(',', '.'))
+      : undefined;
+    if (hasPriceInput && (Number.isNaN(parsedPrice) || (parsedPrice ?? 0) < 0)) {
+      alert('Merci de renseigner un prix valide');
+      return;
+    }
+    setAdditionalServices((prev) => [
+      ...prev,
+      {
+        id: additionalServiceId || undefined,
+        name,
+        price: parsedPrice,
+      },
+    ]);
+    setAdditionalServiceId('');
+    setAdditionalServiceName('');
+    setAdditionalServicePrice('');
+  };
+
+  const handleRemoveAdditionalService = (index: number) => {
+    setAdditionalServices((prev) => prev.filter((_, i) => i !== index));
   };
 
   useEffect(() => {
@@ -110,19 +149,50 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
     setInspectionPhotos([]);
     setReportNotes('');
     setReportPhotos([]);
+    try {
+      const stored = sessionStorage.getItem(getAdditionalServicesStorageKey(booking.id));
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed)) {
+          setAdditionalServices(parsed);
+        } else {
+          setAdditionalServices([]);
+        }
+      } else {
+        setAdditionalServices([]);
+      }
+    } catch (error) {
+      console.warn('Erreur chargement prestations ajoutées:', error);
+      setAdditionalServices([]);
+    }
+    setAdditionalServiceId('');
+    setAdditionalServiceName('');
+    setAdditionalServicePrice('');
     setIsEditing(false);
   }, [booking]);
 
   useEffect(() => {
+    if (!booking) return;
+    try {
+      sessionStorage.setItem(
+        getAdditionalServicesStorageKey(booking.id),
+        JSON.stringify(additionalServices),
+      );
+    } catch (error) {
+      console.warn('Erreur sauvegarde prestations ajoutées:', error);
+    }
+  }, [additionalServices, booking]);
+
+  useEffect(() => {
     if (!booking || !booking.store_id) return;
-    if ((booking.status === 'pending' || isEditing) && services.length === 0) {
+    if (services.length === 0) {
       setServicesLoading(true);
       getStoreServices(booking.store_id)
         .then(setServices)
         .catch(error => console.error('Erreur chargement services magasin:', error))
         .finally(() => setServicesLoading(false));
     }
-  }, [booking, isEditing, services.length]);
+  }, [booking, services.length]);
 
   const handleCompleteBooking = async () => {
     if (!booking) return;
@@ -381,11 +451,22 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
 
     // Appointment Details Table
     drawSectionHeader("DÉTAILS DU RENDEZ-VOUS", 95);
+    const baseEstimate = booking.service_price ?? null;
+    const additionalTotal = additionalServices.reduce(
+      (sum, service) => sum + (service.price ?? 0),
+      0,
+    );
+    const estimatedTotal = baseEstimate !== null ? baseEstimate + additionalTotal : null;
+    const estimateLabel = baseEstimate !== null
+      ? (additionalServices.length > 0
+        ? `${estimatedTotal}€ (inclut prestations ajoutées)`
+        : `${baseEstimate}€`)
+      : "À confirmer sur place";
     const tableData = [
       ["Date de l'intervention", format(parseISO(booking.start_datetime), "EEEE d MMMM yyyy", { locale: fr })],
       ["Créneau horaire", `${format(parseISO(booking.start_datetime), "HH:mm")} - ${format(parseISO(booking.end_datetime), "HH:mm")}`],
       ["Type de service", booking.service_name || "Non spécifié"],
-      ["Estimation tarifaire", booking.service_price ? `${booking.service_price}€` : "À confirmer sur place"],
+      ["Estimation tarifaire", estimateLabel],
     ];
 
     autoTable(doc, {
@@ -410,6 +491,34 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
 
     let currentY = (doc as any).lastAutoTable.finalY + 15;
 
+    if (additionalServices.length > 0) {
+      drawSectionHeader('PRESTATIONS AJOUTÉES', currentY);
+      autoTable(doc, {
+        startY: currentY + 10,
+        head: [['Prestation', 'Prix'] ],
+        body: additionalServices.map((service) => [
+          service.name,
+          service.price !== undefined ? `${service.price}€` : 'À définir',
+        ]),
+        theme: 'grid',
+        headStyles: {
+          fillColor: primaryColor as [number, number, number],
+          textColor: [255, 255, 255],
+          fontStyle: 'bold',
+        },
+        styles: {
+          fontSize: 10,
+          cellPadding: 5,
+          lineColor: [230, 230, 230],
+        },
+        columnStyles: {
+          0: { fontStyle: 'bold', cellWidth: 120 },
+          1: { cellWidth: 50 },
+        },
+      });
+      currentY = (doc as any).lastAutoTable.finalY + 15;
+    }
+
     // Public Notes Section
     const notesToInclude = publicNotes || booking.public_notes;
     if (notesToInclude) {
@@ -423,7 +532,12 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
     }
 
     // Footer
-   
+    doc.setFontSize(9);
+    doc.setTextColor(80, 80, 80);
+    const legalMention =
+      "Le client reconnaît avoir pris connaissance des prestations ajoutées et accepte l'exécution des travaux décrits ci-dessus.";
+    const legalLines = doc.splitTextToSize(legalMention, 170);
+    doc.text(legalLines, 20, currentY + 10);
 
     doc.save(`fiche_alltricks_${format(parseISO(booking.start_datetime), "yyyyMMdd")}_${booking.customer_lastname}.pdf`);
   };
@@ -458,6 +572,24 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
 
   if (!isOpen || !booking) return null;
   const hasReceptionReport = !!booking.customer_data?.reception_report;
+  const selectedAdditionalService = services.find(
+    (service) => service.id === additionalServiceId,
+  );
+  const baseEstimate = booking.service_price !== undefined && booking.service_price !== null
+    ? Number(booking.service_price)
+    : null;
+  const additionalTotal = additionalServices.reduce(
+    (sum, service) => sum + Number(service.price ?? 0),
+    0,
+  );
+  const estimatedTotal = baseEstimate !== null ? baseEstimate + additionalTotal : null;
+  const formatPrice = (value: number) => {
+    const normalized = Number(value);
+    if (Number.isNaN(normalized)) {
+      return '0,00';
+    }
+    return normalized.toFixed(2).replace('.', ',');
+  };
 
   return (
     <>
@@ -503,7 +635,30 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
                     {services.map((service) => (<option key={service.id} value={service.id}>{service.name} ({service.duration_minutes} min) - {service.price}€</option>))}
                   </select>
                 ) : (
-                  <><p className="font-semibold text-gray-900">{booking.service_name}</p>{booking.service_price && <p className="text-sm text-gray-600">{booking.service_price}€</p>}</>
+                  <>
+                    <p className="font-semibold text-gray-900">{booking.service_name}</p>
+                    {booking.service_price && (
+                      <p className="text-sm text-gray-600">{booking.service_price}€</p>
+                    )}
+                    {baseEstimate !== null && additionalServices.length > 0 && (
+                      <p className="text-xs font-semibold text-emerald-700">
+                        Estimation tarifaire : {formatPrice(estimatedTotal ?? 0)}€ (prestations ajoutées incluses)
+                      </p>
+                    )}
+                    {additionalServices.length > 0 && (
+                      <div className="mt-2 space-y-1 rounded-lg border border-emerald-100 bg-emerald-50/40 p-2">
+                        <p className="text-[10px] font-semibold uppercase tracking-wide text-emerald-700">
+                          Prestations ajoutées
+                        </p>
+                        {additionalServices.map((service, index) => (
+                          <p key={`${service.name}-${index}`} className="text-xs text-emerald-900">
+                            {service.name}
+                            {service.price !== undefined ? ` · ${service.price}€` : ''}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -538,6 +693,84 @@ export default function BookingDrawer({ isOpen, booking, onClose, onUpdate }: Bo
             <div className="bg-blue-50/50 rounded-2xl p-6 space-y-4 border border-blue-100 shadow-sm">
               <h3 className="font-bold text-gray-900 flex items-center gap-2"><User className="h-5 w-5 text-blue-600" />Note publique (client)</h3>
               <textarea value={publicNotes} onChange={(e) => setPublicNotes(e.target.value)} onBlur={handleSavePublicNotes} placeholder="Ajouter une note pour le client..." className="w-full h-24 px-4 py-3 border border-blue-200 rounded-xl text-sm" />
+            </div>
+            <div className="bg-emerald-50/60 rounded-2xl p-6 space-y-4 border border-emerald-100 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-gray-900">Prestations ajoutées</h3>
+                  <p className="text-xs text-gray-500">Ces prestations seront indiquées sur la fiche PDF sans modifier la durée du rendez-vous.</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                <label className="text-xs font-medium text-gray-600">Sélectionner une prestation existante</label>
+                <select
+                  value={additionalServiceId}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setAdditionalServiceId(value);
+                    const service = services.find((item) => item.id === value);
+                    if (service) {
+                      setAdditionalServiceName(service.name);
+                      if (!additionalServicePrice) {
+                        setAdditionalServicePrice(String(service.price));
+                      }
+                    }
+                  }}
+                  disabled={servicesLoading}
+                  className="h-10 px-3 border border-emerald-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                >
+                  <option value="">{servicesLoading ? 'Chargement...' : 'Choisir une prestation'}</option>
+                  {services.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.name} - {service.price}€
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-600">Nom de prestation</label>
+                  <input
+                    type="text"
+                    value={additionalServiceName}
+                    onChange={(e) => setAdditionalServiceName(e.target.value)}
+                    placeholder="Ex: Réglage dérailleur"
+                    className="h-10 px-3 border border-emerald-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-gray-600">Prix (optionnel)</label>
+                  <input
+                    type="text"
+                    value={additionalServicePrice}
+                    onChange={(e) => setAdditionalServicePrice(e.target.value)}
+                    placeholder="Ex: 25"
+                    className="h-10 px-3 border border-emerald-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+              <Button variant="ghost" className="border border-emerald-200 text-emerald-700" onClick={handleAddAdditionalService}>
+                Ajouter la prestation
+              </Button>
+              {additionalServices.length > 0 && (
+                <div className="space-y-2">
+                  {additionalServices.map((service, index) => (
+                    <div key={`${service.name}-${index}`} className="flex items-center justify-between rounded-xl border border-emerald-100 bg-white px-4 py-2">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-900">{service.name}</p>
+                        <p className="text-xs text-gray-500">{service.price !== undefined ? `${service.price}€` : 'Prix à définir'}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAdditionalService(index)}
+                        className="text-xs font-semibold text-emerald-700 hover:text-emerald-900"
+                      >
+                        Supprimer
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
