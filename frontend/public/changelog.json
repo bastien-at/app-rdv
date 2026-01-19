@@ -1,6 +1,11 @@
 {
-  "generatedAt": "2026-01-19T08:23:00.000Z",
+  "generatedAt": "2026-01-19T08:49:00.000Z",
   "entries": [
+    {
+      "hash": "local",
+      "message": "fix: limiter les blocages récurrents aux 12 prochains mois",
+      "date": "2026-01-19"
+    },
     {
       "hash": "local",
       "message": "feat: ajout de prestations en admin (drawer + PDF) avec estimation mise à jour",

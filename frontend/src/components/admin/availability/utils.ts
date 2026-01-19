@@ -27,7 +27,7 @@ export const buildRecurringDates = (startDateValue: string, recurringDay: string
   const dates: Date[] = [];
   let cursor = firstDate;
 
-  while (cursor <= endDate) {
+  while (cursor < endDate) {
     dates.push(cursor);
     cursor = addDays(cursor, 7);
   }
