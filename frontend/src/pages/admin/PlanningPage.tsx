@@ -1,5 +1,5 @@
 import { useState, useEffect, Fragment } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   ChevronLeft,
   ChevronRight,
@@ -95,6 +95,7 @@ type ViewMode = 'day' | 'week' | 'month';
 
 export default function PlanningPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [stores, setStores] = useState<Store[]>([]);
@@ -128,6 +129,15 @@ export default function PlanningPage() {
   const [importMode, setImportMode] = useState<'update' | 'skip'>('update');
   const [importResult, setImportResult] = useState<AdminImportBookingsResult | null>(null);
   const [importLoading, setImportLoading] = useState(false);
+
+  useEffect(() => {
+    const weekParam = searchParams.get('week');
+    if (!weekParam) return;
+    const parsedDate = parseISO(weekParam);
+    if (isNaN(parsedDate.getTime())) return;
+    setViewMode('week');
+    setCurrentDate(parsedDate);
+  }, [searchParams]);
 
   const getAdminStoreId = (): string | null => {
     if (typeof window === 'undefined') return null;

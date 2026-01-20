@@ -1,6 +1,21 @@
 {
-  "generatedAt": "2026-01-16T15:22:00.000Z",
+  "generatedAt": "2026-01-19T08:49:00.000Z",
   "entries": [
+    {
+      "hash": "local",
+      "message": "fix: blocage admin n'annule que les RDV du même type de service",
+      "date": "2026-01-20"
+    },
+    {
+      "hash": "local",
+      "message": "fix: limiter les blocages récurrents aux 12 prochains mois",
+      "date": "2026-01-19"
+    },
+    {
+      "hash": "local",
+      "message": "feat: ajout de prestations en admin (drawer + PDF) avec estimation mise à jour",
+      "date": "2026-01-19"
+    },
     {
       "hash": "local",
       "message": "feat: import TSV des RDV (admin) avec mode update/skip, statut pending par défaut et sans emails",

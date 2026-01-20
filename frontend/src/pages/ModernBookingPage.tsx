@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, Clock, User, Calendar as CalendarIcon, Mail, Phone, Bike, Wrench, Check, MapPin, Search, HelpCircle, LayoutDashboard } from 'lucide-react';
-import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, isBefore, startOfDay, addMonths } from 'date-fns';
+import { format, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, isToday, isBefore, startOfDay, addMonths, parseISO, isValid } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import Button from '../components/Button';
 import Input from '../components/Input';
@@ -16,6 +16,8 @@ export default function ModernBookingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const serviceType = searchParams.get('type') as 'fitting' | 'workshop' | null;
+  const preselectedDateParam = searchParams.get('date');
+  const preselectedTimeParam = searchParams.get('time');
   const [storeId, setStoreId] = useState<string | null>(null);
   
   const [isAdmin, setIsAdmin] = useState(false);
@@ -168,6 +170,14 @@ export default function ModernBookingPage() {
     }
   }, [selectedService, selectedDate]);
 
+  useEffect(() => {
+    if (!preselectedDateParam || selectedDate) return;
+    const parsedDate = parseISO(preselectedDateParam);
+    if (isValid(parsedDate)) {
+      setSelectedDate(parsedDate);
+    }
+  }, [preselectedDateParam, selectedDate]);
+
   // Prefetch month availability
   useEffect(() => {
     if (step === 'date' && selectedService && storeId) {
@@ -234,6 +244,16 @@ export default function ModernBookingPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!preselectedTimeParam || availableSlots.length === 0 || selectedSlot) return;
+    const matchingSlot = availableSlots.find((slot) =>
+      format(new Date(slot.start_datetime), 'HH:mm') === preselectedTimeParam
+    );
+    if (matchingSlot) {
+      setSelectedSlot(matchingSlot);
+    }
+  }, [availableSlots, preselectedTimeParam, selectedSlot]);
 
   const handleServiceSelect = (service: Service) => {
     setSelectedService(service);
@@ -317,7 +337,9 @@ export default function ModernBookingPage() {
       const booking = await createBooking(bookingData);
       
       if (isAdmin) {
-        navigate('/admin/planning');
+        const selectedDateTime = new Date(selectedSlot.start_datetime);
+        const weekParam = format(selectedDateTime, 'yyyy-MM-dd');
+        navigate(`/admin/planning?week=${weekParam}`);
       } else {
         navigate(`/booking/${booking.booking_token}`);
       }
