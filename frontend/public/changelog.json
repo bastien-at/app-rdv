@@ -3,6 +3,11 @@
   "entries": [
     {
       "hash": "local",
+      "message": "fix: blocage admin n'annule que les RDV du même type de service",
+      "date": "2026-01-20"
+    },
+    {
+      "hash": "local",
       "message": "fix: limiter les blocages récurrents aux 12 prochains mois",
       "date": "2026-01-19"
     },

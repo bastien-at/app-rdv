@@ -1117,8 +1117,9 @@ export const createAvailabilityBlock = async (
       WHERE b.store_id = $1 
       AND b.status IN ('confirmed', 'pending')
       AND b.start_datetime < $2 
-      AND b.end_datetime > $3`,
-      [store_id, end, start]
+      AND b.end_datetime > $3
+      AND ($4::text IS NULL OR srv.service_type = $4::text)`,
+      [store_id, end, start, service_type || null]
     );
 
     const conflictingBookings = conflictResult.rows;
